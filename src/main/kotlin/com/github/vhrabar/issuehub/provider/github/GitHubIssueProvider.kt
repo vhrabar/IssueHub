@@ -5,6 +5,7 @@ import com.github.vhrabar.issuehub.model.IssueLabel
 import com.github.vhrabar.issuehub.model.IssueQuery
 import com.github.vhrabar.issuehub.model.IssueState
 import com.github.vhrabar.issuehub.provider.IssueProvider
+import com.github.vhrabar.issuehub.settings.IssueHubSecrets
 import com.intellij.openapi.project.Project
 import kotlin.collections.map
 
@@ -42,7 +43,7 @@ class GitHubIssueProvider: IssueProvider {
 
     override suspend fun fetchIssues(project: Project, query: IssueQuery): List<Issue> {
         val repo = RepoDetector.detect(project) ?: return emptyList()
-        val token = null
+        val token = IssueHubSecrets.getToken(identifier)
         return client.fetchIssues(repo, token, query.state.toApiParam(), query.limit).map { it.toIssue() }
     }
 
