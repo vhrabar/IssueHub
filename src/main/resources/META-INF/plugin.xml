@@ -2,18 +2,28 @@
 <idea-plugin>
     <id>com.github.vhrabar.issuehub</id>
     <name>IssueHub</name>
-    <vendor>vhrabar</vendor>
-    <description><![CDATA[
-        <p><b>IssueHub</b> is a repository that provides a pure template to make it easier to create a new plugin project.</p>
-        <p>The main goal of this template is to speed up the setup phase of plugin development for both new and experienced developers by preconfiguring the project scaffold and CI, linking to the proper documentation pages, and keeping everything organized.</p>
-    ]]></description>
+    <vendor url="https://github.com/vhrabar">Vedran Hrabar</vendor>
+    <!-- <description> is injected at build time from README.md -->
 
     <depends>com.intellij.modules.platform</depends>
 
-    <resource-bundle>messages.MyBundle</resource-bundle>
+    <resource-bundle>messages.IssueHubBundle</resource-bundle>
+
+    <extensionPoints>
+        <extensionPoint
+            name="issueProvider"
+            interface="com.github.vhrabar.issuehub.provider.IssueProvider"
+            dynamic="true"/>
+    </extensionPoints>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.vhrabar.issuehub.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
-        <postStartupActivity implementation="com.github.vhrabar.issuehub.startup.MyProjectActivity" />
+        <toolWindow
+            id="IssueHub"
+            anchor="left"
+            factoryClass="com.github.vhrabar.issuehub.toolWindow.IssueHubToolWindowFactory"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.github.vhrabar.issuehub">
+        <issueProvider implementation="com.github.vhrabar.issuehub.provider.github.GitHubIssueProvider"/>
     </extensions>
 </idea-plugin>

@@ -1,24 +1,51 @@
 # IssueHub
 
-![Build](https://github.com/vhrabar/IssueHub/workflows/Build/badge.svg)
-[![Version](https://img.shields.io/jetbrains/plugin/v/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
-[![Downloads](https://img.shields.io/jetbrains/plugin/d/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/vhrabar/IssueHub/build.yml?style=for-the-badge)
+[![Version](https://img.shields.io/jetbrains/plugin/v/33044.svg?style=for-the-badge)](https://plugins.jetbrains.com/plugin/33044)
+[![Downloads](https://img.shields.io/jetbrains/plugin/d/33044.svg?style=for-the-badge)](https://plugins.jetbrains.com/plugin/33044)
 
-## Template ToDo list
-- [x] Create a new [IntelliJ Platform Plugin Template][template] project.
-- [ ] Get familiar with the [template documentation][template].
-- [ ] Adjust the [group](./gradle.properties), as well as the [id](./src/main/resources/META-INF/plugin.xml), [name](./src/main/resources/META-INF/plugin.xml), and [sources package](./src/main/kotlin).
-- [ ] Adjust the plugin [description](./src/main/resources/META-INF/plugin.xml) (see [Tips][docs:plugin-description]) and this README to describe what your plugin does.
-- [ ] Review the [Legal Agreements](https://plugins.jetbrains.com/docs/marketplace/legal-agreements.html?from=IJPluginTemplate).
-- [ ] [Publish a plugin manually](https://plugins.jetbrains.com/docs/intellij/publishing-plugin.html?from=IJPluginTemplate) for the first time.
-- [ ] Set the `MARKETPLACE_ID` in the above README badges. You can obtain it once the plugin is published to JetBrains Marketplace.
-- [ ] Set the [Plugin Signing](https://plugins.jetbrains.com/docs/intellij/plugin-signing.html?from=IJPluginTemplate) related [secrets](https://github.com/JetBrains/intellij-platform-plugin-template#environment-variables).
-- [ ] Set the [Deployment Token](https://plugins.jetbrains.com/docs/marketplace/plugin-upload.html?from=IJPluginTemplate).
-- [ ] Click the <kbd>Watch</kbd> button on the top of the [IntelliJ Platform Plugin Template][template] to be notified about releases containing new features and fixes.
 
-This Fancy IntelliJ Platform Plugin is going to be your implementation of the brilliant ideas that you have.
+
+>  **Alpha.** Core flow works (detect repo > add token > list issues). Configuration is a
+> placeholder, GitHub is the only supported provider.
+
+<!-- Plugin description -->
+**IssueHub** brings your GitHub issues into the IDE. Browse and open issues for the current
+repository from a dedicated tool window, without leaving your editor.
+
+- Lists issues for the GitHub repository detected from your project's Git remote
+- Shows issue number, title, labels, and assignee
+- Opens any issue in the browser with a double-click
+- Stores your GitHub token in the IDE's secure credential store
+
+**Getting started:** open the **IssueHub** tool window, click **Add Token…** to paste a GitHub
+personal access token (read-only scope is enough), then click **Refresh**. Public repositories work
+without a token.
+<!-- Plugin description end -->
+
+## Usage (Alpha)
+
+1. Open a project whose Git remote points at a GitHub repository, IssueHub reads the repo from
+   `.git/config` automatically.
+2. Open the **IssueHub** tool window.
+3. Click **Add Token…** and paste a GitHub personal access token (stored in the IDE's secure
+   credential store, never in plain text).
+4. Click **Refresh** to load issues. Double-click an issue to open it in your browser.
+
+### Required token scope
+
+| Repository | Token type | Scope / permission needed                                                                                                                                |
+|------------|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Public** | none, or any token | Reads without authentication (60 req/hr); any token, even one with **no scopes**, just raises the rate limit.                                            |
+| **Private** | fine-grained PAT | Repository access + **Issues: Read-only** (Metadata: Read is included automatically).                                                                    |
+| **Private** | classic PAT | `repo`: note this is the *only* classic scope that reads private repos, and it grants full read/write. Prefer a fine-grained token for read-only access. |
+
+IssueHub only reads issues (for now), so it never needs write access. For private repos, prefer a
+fine-grained token with **Issues: Read-only** as classic tokens can't scope down to read-only.
 
 ## Installation
+
+[![Install from JetBrains Marketplace](https://img.shields.io/badge/JetBrains%20Marketplace-Install-blue?logo=jetbrains&style=for-the-badge)](https://plugins.jetbrains.com/plugin/33044)
 
 - Using the IDE built-in plugin system:
 
@@ -27,9 +54,9 @@ This Fancy IntelliJ Platform Plugin is going to be your implementation of the br
 
 - Using JetBrains Marketplace:
 
-  Go to [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID) and install it by clicking the <kbd>Install to ...</kbd> button in case your IDE is running.
+  Go to [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/33044) and install it by clicking the <kbd>Install to ...</kbd> button in case your IDE is running.
 
-  You can also download the [latest release](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID/versions) from JetBrains Marketplace and install it manually using
+  You can also download the [latest release](https://plugins.jetbrains.com/plugin/33044/versions) from JetBrains Marketplace and install it manually using
   <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
 
 - Manually:
@@ -37,6 +64,10 @@ This Fancy IntelliJ Platform Plugin is going to be your implementation of the br
   Download the [latest release](https://github.com/vhrabar/IssueHub/releases/latest) and install it manually using
   <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
 
+## License
+This project is licensed under the Apache License v2 - see the [LICENSE](LICENSE) file for details
+
+Copyright © 2026 Vedran Hrabar
 
 ---
 Plugin based on the [IntelliJ Platform Plugin Template][template].

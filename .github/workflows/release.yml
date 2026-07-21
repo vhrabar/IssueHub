@@ -13,6 +13,9 @@ jobs:
   release:
     name: Publish Plugin
     runs-on: ubuntu-latest
+    environment:
+      name: jetbrains-marketplace
+      url: https://plugins.jetbrains.com/plugin/33044
     permissions:
       contents: write
       pull-requests: write
@@ -81,8 +84,8 @@ jobs:
           BRANCH="changelog-update-$VERSION"
           LABEL="release changelog"
 
-          git config user.email "action@github.com"
-          git config user.name "GitHub Action"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
 
           git checkout -b $BRANCH
           git commit -am "Changelog update - $VERSION"
