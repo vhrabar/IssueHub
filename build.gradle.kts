@@ -1,3 +1,4 @@
+import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
@@ -20,6 +21,18 @@ dependencies {
 
 intellijPlatform {
     pluginConfiguration {
+        // Marketplace description is sourced from README.md between the marker comments
+        description = providers.fileContents(layout.projectDirectory.file("README.md")).asText.map {
+            val start = "<!-- Plugin description -->"
+            val end = "<!-- Plugin description end -->"
+            with(it.lines()) {
+                if (!containsAll(listOf(start, end))) {
+                    throw GradleException("README.md is missing the plugin description section:\n$start ... $end")
+                }
+                subList(indexOf(start) + 1, indexOf(end)).joinToString("\n").let(::markdownToHTML)
+            }
+        }
+
         changeNotes = provider {
             with(changelog) {
                 renderItem(

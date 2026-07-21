@@ -9,6 +9,20 @@
 >  **Alpha.** Core flow works (detect repo > add token > list issues). Configuration is a
 > placeholder, GitHub is the only supported provider.
 
+<!-- Plugin description -->
+**IssueHub** brings your GitHub issues into the IDE. Browse and open issues for the current
+repository from a dedicated tool window, without leaving your editor.
+
+- Lists issues for the GitHub repository detected from your project's Git remote
+- Shows issue number, title, labels, and assignee
+- Opens any issue in the browser with a double-click
+- Stores your GitHub token in the IDE's secure credential store
+
+**Getting started:** open the **IssueHub** tool window, click **Add Token…** to paste a GitHub
+personal access token (read-only scope is enough), then click **Refresh**. Public repositories work
+without a token.
+<!-- Plugin description end -->
+
 ## Usage (Alpha)
 
 1. Open a project whose Git remote points at a GitHub repository, IssueHub reads the repo from

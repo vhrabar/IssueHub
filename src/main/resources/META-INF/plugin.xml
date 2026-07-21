@@ -3,15 +3,7 @@
     <id>com.github.vhrabar.issuehub</id>
     <name>IssueHub</name>
     <vendor url="https://github.com/vhrabar">Vedran Hrabar</vendor>
-    <description><![CDATA[
-        <p><b>IssueHub</b> brings your GitHub issues into the IDE. Browse, filter, and open issues for the
-        current repository from a dedicated tool window, without leaving your editor.</p>
-        <ul>
-            <li>List open and closed issues for the configured repository</li>
-            <li>Inspect issue details, labels, and assignees</li>
-            <li>Open any issue in the browser with a click</li>
-        </ul>
-    ]]></description>
+    <!-- <description> is injected at build time from README.md -->
 
     <depends>com.intellij.modules.platform</depends>
 
