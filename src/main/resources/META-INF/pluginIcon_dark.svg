@@ -1,0 +1,29 @@
+<svg width="40" height="40" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="hubGlowDark" cx="50%" cy="46%" r="55%">
+      <stop offset="0%" stop-color="#9184d9" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#9184d9" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="plateGradDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1d2036"/>
+      <stop offset="100%" stop-color="#161826"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="124" height="124" rx="26" fill="url(#plateGradDark)"/>
+  <rect x="2" y="2" width="124" height="124" rx="26" fill="none" stroke="#2b2f47" stroke-width="1"/>
+  <circle cx="64" cy="60" r="46" fill="url(#hubGlowDark)"/>
+  <line x1="64" y1="60" x2="64" y2="28" stroke="#5b53a8" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="64" y1="60" x2="93" y2="45" stroke="#5b53a8" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="64" y1="60" x2="93" y2="78" stroke="#5b53a8" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="64" y1="60" x2="64" y2="94" stroke="#5b53a8" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="64" y1="60" x2="35" y2="78" stroke="#5b53a8" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="64" y1="60" x2="35" y2="45" stroke="#5b53a8" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="64" cy="28" r="6" fill="#9184d9"/>
+  <circle cx="93" cy="45" r="6" fill="#9184d9"/>
+  <circle cx="93" cy="78" r="6" fill="#9184d9"/>
+  <circle cx="64" cy="94" r="6" fill="#9184d9"/>
+  <circle cx="35" cy="78" r="6" fill="#9184d9"/>
+  <circle cx="35" cy="45" r="6" fill="#9184d9"/>
+  <circle cx="64" cy="60" r="12" fill="#161826" stroke="#c3bced" stroke-width="2"/>
+  <circle cx="64" cy="60" r="4.5" fill="#e9e9ed"/>
+</svg>

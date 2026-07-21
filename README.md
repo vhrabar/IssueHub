@@ -1,8 +1,8 @@
 # IssueHub
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/vhrabar/IssueHub/build.yml?style=for-the-badge)
-[![Version](https://img.shields.io/jetbrains/plugin/v/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
-[![Downloads](https://img.shields.io/jetbrains/plugin/d/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
+[![Version](https://img.shields.io/jetbrains/plugin/v/33044.svg?style=for-the-badge)](https://plugins.jetbrains.com/plugin/33044)
+[![Downloads](https://img.shields.io/jetbrains/plugin/d/33044.svg?style=for-the-badge)](https://plugins.jetbrains.com/plugin/33044)
 
 
 
@@ -30,6 +30,8 @@ IssueHub only reads issues (for now), so it never needs write access. For privat
 fine-grained token with **Issues: Read-only** as classic tokens can't scope down to read-only.
 
 ## Installation
+
+[![Install from JetBrains Marketplace](https://img.shields.io/badge/JetBrains%20Marketplace-Install-blue?logo=jetbrains&style=for-the-badge)](https://plugins.jetbrains.com/plugin/33044)
 
 - Using the IDE built-in plugin system:
 
