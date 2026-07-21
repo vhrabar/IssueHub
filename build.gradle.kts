@@ -17,3 +17,8 @@ dependencies {
         testFramework(TestFrameworkType.Platform)
     }
 }
+
+// pin JVM 21
+kotlin {
+    jvmToolchain(21)
+}
