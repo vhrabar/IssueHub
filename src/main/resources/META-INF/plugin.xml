@@ -2,7 +2,7 @@
 <idea-plugin>
     <id>com.github.vhrabar.issuehub</id>
     <name>IssueHub</name>
-    <vendor>vhrabar</vendor>
+    <vendor url="https://github.com/vhrabar">Vedran Hrabar</vendor>
     <description><![CDATA[
         <p><b>IssueHub</b> brings your GitHub issues into the IDE. Browse, filter, and open issues for the
         current repository from a dedicated tool window, without leaving your editor.</p>

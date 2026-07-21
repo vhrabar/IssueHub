@@ -18,6 +18,21 @@ dependencies {
     }
 }
 
+intellijPlatform {
+    pluginConfiguration {
+        changeNotes = provider {
+            with(changelog) {
+                renderItem(
+                    (getOrNull(project.version.toString()) ?: getUnreleased())
+                        .withHeader(false)
+                        .withEmptySections(false),
+                    org.jetbrains.changelog.Changelog.OutputType.HTML,
+                )
+            }
+        }
+    }
+}
+
 // pin JVM 21
 kotlin {
     jvmToolchain(21)
