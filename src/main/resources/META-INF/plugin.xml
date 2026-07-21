@@ -17,10 +17,21 @@
 
     <resource-bundle>messages.IssueHubBundle</resource-bundle>
 
+    <extensionPoints>
+        <extensionPoint
+            name="issueProvider"
+            interface="com.github.vhrabar.issuehub.provider.IssueProvider"
+            dynamic="true"/>
+    </extensionPoints>
+
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow
             id="IssueHub"
-            anchor="right"
+            anchor="left"
             factoryClass="com.github.vhrabar.issuehub.toolWindow.IssueHubToolWindowFactory"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.github.vhrabar.issuehub">
+        <issueProvider implementation="com.github.vhrabar.issuehub.provider.github.GitHubIssueProvider"/>
     </extensions>
 </idea-plugin>
