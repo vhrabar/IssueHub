@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: jetbrains-marketplace
-      url: https://plugins.jetbrains.com/plugin/MARKETPLACE_ID
+      url: https://plugins.jetbrains.com/plugin/33044
     permissions:
       contents: write
       pull-requests: write
