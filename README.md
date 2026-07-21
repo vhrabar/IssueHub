@@ -6,6 +6,29 @@
 
 
 
+>  **Alpha.** Core flow works (detect repo > add token > list issues). Configuration is a
+> placeholder, GitHub is the only supported provider.
+
+## Usage (Alpha)
+
+1. Open a project whose Git remote points at a GitHub repository, IssueHub reads the repo from
+   `.git/config` automatically.
+2. Open the **IssueHub** tool window.
+3. Click **Add Token…** and paste a GitHub personal access token (stored in the IDE's secure
+   credential store, never in plain text).
+4. Click **Refresh** to load issues. Double-click an issue to open it in your browser.
+
+### Required token scope
+
+| Repository | Token type | Scope / permission needed                                                                                                                                |
+|------------|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Public** | none, or any token | Reads without authentication (60 req/hr); any token, even one with **no scopes**, just raises the rate limit.                                            |
+| **Private** | fine-grained PAT | Repository access + **Issues: Read-only** (Metadata: Read is included automatically).                                                                    |
+| **Private** | classic PAT | `repo`: note this is the *only* classic scope that reads private repos, and it grants full read/write. Prefer a fine-grained token for read-only access. |
+
+IssueHub only reads issues (for now), so it never needs write access. For private repos, prefer a
+fine-grained token with **Issues: Read-only** as classic tokens can't scope down to read-only.
+
 ## Installation
 
 - Using the IDE built-in plugin system:
