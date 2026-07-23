@@ -12,6 +12,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.openapi.wm.impl.content.ToolWindowContentUi
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBPanel
@@ -38,7 +39,8 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val panel = IssueHubToolWindowPanel(project)
-        val content = ContentFactory.getInstance().createContent(panel, null, false)
+        toolWindow.component.putClientProperty(ToolWindowContentUi.HIDE_ID_LABEL, "true")
+        val content = ContentFactory.getInstance().createContent(panel, IssueHubBundle["toolWindow.title"], false)
         toolWindow.contentManager.addContent(content)
     }
 
