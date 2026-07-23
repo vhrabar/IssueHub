@@ -27,7 +27,10 @@ private fun GitHubIssueDto.toIssue(): Issue = Issue(
     body = body,
     labels = labels.map { IssueLabel(it.name, it.color) },
     assignee = assignee?.login,
+    author = user?.login,
+    commentCount = comments,
     url = htmlUrl,
+    createdAt = createdAt,
     updatedAt = updatedAt,
 )
 

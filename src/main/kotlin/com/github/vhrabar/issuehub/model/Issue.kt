@@ -17,7 +17,10 @@ data class Issue(
     val body: String? = null,
     val labels: List<IssueLabel> = emptyList(),
     val assignee: String? = null,
+    val author: String? = null,
+    val commentCount: Int = 0,
     val url: String,
+    val createdAt: String,
     val updatedAt: String,
 )
 

@@ -28,7 +28,10 @@ internal data class GitHubIssueDto(
     val body: String? = null,
     val labels: List<GitHubLabelDto> = emptyList(),
     val assignee: GitHubUserDto? = null,
+    val user: GitHubUserDto? = null,
+    val comments: Int = 0,
     @SerialName("html_url") val htmlUrl: String,
+    @SerialName("created_at") val createdAt: String,
     @SerialName("updated_at") val updatedAt: String,
 
     @SerialName("pull_request") val pullRequest: GitHubPullRequestRefDto? = null,
