@@ -12,6 +12,7 @@ internal data class GitHubLabelDto(
 @Serializable
 internal data class GitHubUserDto(
     val login: String,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
 )
 
 @Serializable
