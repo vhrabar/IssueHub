@@ -36,8 +36,10 @@ import javax.swing.SwingUtilities
 import javax.swing.ToolTipManager
 
 class IssueHubToolWindowFactory : ToolWindowFactory {
-
-    override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
+    override fun createToolWindowContent(
+        project: Project,
+        toolWindow: ToolWindow,
+    ) {
         val panel = IssueHubToolWindowPanel(project)
         toolWindow.component.putClientProperty(ToolWindowContentUi.HIDE_ID_LABEL, "true")
         val content = ContentFactory.getInstance().createContent(panel, IssueHubBundle["toolWindow.title"], false)
@@ -46,27 +48,33 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
 
     override fun shouldBeAvailable(project: Project) = true
 
-    private class IssueHubToolWindowPanel(private val project: Project) :
-        JBPanel<IssueHubToolWindowPanel>(BorderLayout()) {
-
+    private class IssueHubToolWindowPanel(
+        private val project: Project,
+    ) : JBPanel<IssueHubToolWindowPanel>(BorderLayout()) {
         private val listModel = DefaultListModel<Issue>()
-        private val issueList = object : JBList<Issue>(listModel) {
-            override fun getToolTipText(event: MouseEvent): String? {
-                val index = locationToIndex(event.point)
-                if (index < 0) return null
-                val bounds = getCellBounds(index, index)?.takeIf { it.contains(event.point) } ?: return null
-                val renderer = cellRenderer.getListCellRendererComponent(
-                    this, model.getElementAt(index), index, false, false,
-                ) as? JComponent ?: return null
-                renderer.bounds = bounds
-                layoutTree(renderer)
-                val target = SwingUtilities.getDeepestComponentAt(renderer, event.x - bounds.x, event.y - bounds.y)
-                return (target as? JComponent)?.toolTipText
+        private val issueList =
+            object : JBList<Issue>(listModel) {
+                override fun getToolTipText(event: MouseEvent): String? {
+                    val index = locationToIndex(event.point)
+                    if (index < 0) return null
+                    val bounds = getCellBounds(index, index)?.takeIf { it.contains(event.point) } ?: return null
+                    val renderer =
+                        cellRenderer.getListCellRendererComponent(
+                            this,
+                            model.getElementAt(index),
+                            index,
+                            false,
+                            false,
+                        ) as? JComponent ?: return null
+                    renderer.bounds = bounds
+                    layoutTree(renderer)
+                    val target = SwingUtilities.getDeepestComponentAt(renderer, event.x - bounds.x, event.y - bounds.y)
+                    return (target as? JComponent)?.toolTipText
+                }
+            }.apply {
+                selectionMode = ListSelectionModel.SINGLE_SELECTION
+                ToolTipManager.sharedInstance().registerComponent(this)
             }
-        }.apply {
-            selectionMode = ListSelectionModel.SINGLE_SELECTION
-            ToolTipManager.sharedInstance().registerComponent(this)
-        }
 
         // Repaints the list once an avatar finishes downloading so the real picture replaces initials.
         private val avatarLoader = AvatarLoader(issueList::repaint)
@@ -74,33 +82,39 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         // CENTER swaps between a status message and the issue list.
         private val statusLabel = JBLabel(IssueHubBundle["toolWindow.placeholder"])
         private val cardLayout = CardLayout()
-        private val center = JBPanel<JBPanel<*>>(cardLayout).apply {
-            add(JBPanel<JBPanel<*>>(BorderLayout()).apply {
-                border = JBUI.Borders.empty(10)
-                add(statusLabel, BorderLayout.NORTH)
-            }, STATUS_CARD)
-            // Rows ellipsize to the viewport width, so a horizontal scrollbar would never be useful.
-            add(
-                JBScrollPane(issueList).apply {
-                    horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
-                    border = JBUI.Borders.empty()
-                },
-                LIST_CARD,
-            )
-        }
+        private val center =
+            JBPanel<JBPanel<*>>(cardLayout).apply {
+                add(
+                    JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                        border = JBUI.Borders.empty(10)
+                        add(statusLabel, BorderLayout.NORTH)
+                    },
+                    STATUS_CARD,
+                )
+                // Rows ellipsize to the viewport width, so a horizontal scrollbar would never be useful.
+                add(
+                    JBScrollPane(issueList).apply {
+                        horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
+                        border = JBUI.Borders.empty()
+                    },
+                    LIST_CARD,
+                )
+            }
 
         init {
             issueList.cellRenderer = IssueCellRenderer(avatarLoader)
             add(buildToolbar(), BorderLayout.NORTH)
             add(center, BorderLayout.CENTER)
 
-            issueList.addMouseListener(object : MouseAdapter() {
-                override fun mouseClicked(e: MouseEvent) {
-                    if (e.clickCount == 2) {
-                        issueList.selectedValue?.url?.let { BrowserUtil.browse(it) }
+            issueList.addMouseListener(
+                object : MouseAdapter() {
+                    override fun mouseClicked(e: MouseEvent) {
+                        if (e.clickCount == 2) {
+                            issueList.selectedValue?.url?.let { BrowserUtil.browse(it) }
+                        }
                     }
-                }
-            })
+                },
+            )
 
             refresh()
         }
@@ -108,13 +122,17 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         private fun buildToolbar(): JBPanel<*> {
             val toolbar = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(4)))
             toolbar.border = JBUI.Borders.empty(4)
-            toolbar.add(JButton(IssueHubBundle["toolWindow.refresh"]).apply {
-                addActionListener { refresh() }
-            })
+            toolbar.add(
+                JButton(IssueHubBundle["toolWindow.refresh"]).apply {
+                    addActionListener { refresh() }
+                },
+            )
             // TODO: temporary placeholder until a proper settings UI exists.
-            toolbar.add(JButton(IssueHubBundle["toolWindow.addToken"]).apply {
-                addActionListener { promptForToken() }
-            })
+            toolbar.add(
+                JButton(IssueHubBundle["toolWindow.addToken"]).apply {
+                    addActionListener { promptForToken() }
+                },
+            )
             return toolbar
         }
 
@@ -152,10 +170,12 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         }
 
         private fun promptForToken() {
-            val token = Messages.showPasswordDialog(
-                IssueHubBundle["toolWindow.addToken.message"],
-                IssueHubBundle["toolWindow.addToken.title"],
-            )?.takeIf { it.isNotBlank() } ?: return
+            val token =
+                Messages
+                    .showPasswordDialog(
+                        IssueHubBundle["toolWindow.addToken.message"],
+                        IssueHubBundle["toolWindow.addToken.title"],
+                    )?.takeIf { it.isNotBlank() } ?: return
 
             ApplicationManager.getApplication().executeOnPooledThread {
                 IssueHubSecrets.setToken(GitHubIssueProvider.PROVIDER_IDENTIFIER, token)

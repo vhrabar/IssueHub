@@ -8,16 +8,21 @@ import org.jetbrains.annotations.PropertyKey
 private const val BUNDLE = "messages.IssueHubBundle"
 
 object IssueHubBundle : DynamicBundle(BUNDLE) {
-
-    operator fun get(@PropertyKey(resourceBundle = BUNDLE) key: String, vararg params: Any) =
-        getMessage(key, *params)
+    operator fun get(
+        @PropertyKey(resourceBundle = BUNDLE) key: String,
+        vararg params: Any,
+    ) = getMessage(key, *params)
 
     @JvmStatic
-    fun message(@PropertyKey(resourceBundle = BUNDLE) key: String, vararg params: Any) =
-        getMessage(key, *params)
+    fun message(
+        @PropertyKey(resourceBundle = BUNDLE) key: String,
+        vararg params: Any,
+    ) = getMessage(key, *params)
 
     @Suppress("unused")
     @JvmStatic
-    fun messagePointer(@PropertyKey(resourceBundle = BUNDLE) key: String, vararg params: Any) =
-        getLazyMessage(key, *params)
+    fun messagePointer(
+        @PropertyKey(resourceBundle = BUNDLE) key: String,
+        vararg params: Any,
+    ) = getLazyMessage(key, *params)
 }

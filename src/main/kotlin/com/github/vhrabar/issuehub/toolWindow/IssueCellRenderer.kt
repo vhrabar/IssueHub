@@ -37,8 +37,8 @@ import javax.swing.ListCellRenderer
 
 internal class IssueCellRenderer(
     private val avatarLoader: AvatarLoader,
-) : JBPanel<IssueCellRenderer>(BorderLayout()), ListCellRenderer<Issue> {
-
+) : JBPanel<IssueCellRenderer>(BorderLayout()),
+    ListCellRenderer<Issue> {
     private val title = borderless()
     private val labelIcon = JBLabel()
     private val stateText = borderless()
@@ -46,21 +46,24 @@ internal class IssueCellRenderer(
     private val comments = borderless()
     private val meta = borderless()
 
-    private val trailing = transparentPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(6), 0)).apply {
-        add(stateText)
-        add(avatar)
-        add(comments)
-    }
+    private val trailing =
+        transparentPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(6), 0)).apply {
+            add(stateText)
+            add(avatar)
+            add(comments)
+        }
 
-    private val titleRow = transparentPanel(TitleRowLayout(JBUI.scale(5))).apply {
-        add(title)
-        add(labelIcon)
-    }
+    private val titleRow =
+        transparentPanel(TitleRowLayout(JBUI.scale(5))).apply {
+            add(title)
+            add(labelIcon)
+        }
 
-    private val topRow = transparentPanel(BorderLayout(JBUI.scale(8), 0)).apply {
-        add(titleRow, BorderLayout.CENTER)
-        add(trailing, BorderLayout.EAST)
-    }
+    private val topRow =
+        transparentPanel(BorderLayout(JBUI.scale(8), 0)).apply {
+            add(titleRow, BorderLayout.CENTER)
+            add(trailing, BorderLayout.EAST)
+        }
 
     /** Width the list can actually give this row; see [getPreferredSize]. */
     private var availableWidth = 0
@@ -113,7 +116,11 @@ internal class IssueCellRenderer(
     /**
      * Labels collapse to a single tag icon tinted with the first label's color.
      */
-    private fun renderLabels(value: Issue, selected: Boolean, hasFocus: Boolean) {
+    private fun renderLabels(
+        value: Issue,
+        selected: Boolean,
+        hasFocus: Boolean,
+    ) {
         val first = value.labels.firstOrNull()
         labelIcon.isVisible = first != null
         if (first == null) {
@@ -133,10 +140,11 @@ internal class IssueCellRenderer(
     private fun labelsTooltip(labels: List<IssueLabel>): String {
         val background = UIUtil.getToolTipBackground()
         // A borderless table keeps the swatch and name vertically centered against each row's height.
-        val rows = labels.joinToString("") { label ->
-            "<tr><td valign='middle'>${labelSwatch(labelTint(label, background))}</td>" +
-                "<td valign='middle'>&nbsp;${escapeHtml(label.name)}</td></tr>"
-        }
+        val rows =
+            labels.joinToString("") { label ->
+                "<tr><td valign='middle'>${labelSwatch(labelTint(label, background))}</td>" +
+                    "<td valign='middle'>&nbsp;${escapeHtml(label.name)}</td></tr>"
+            }
         return "<html><b>${escapeHtml(IssueHubBundle["issue.labels.title"])}</b>" +
             "<table cellpadding='0' cellspacing='0'>$rows</table></html>"
     }
@@ -147,21 +155,28 @@ internal class IssueCellRenderer(
             ?: """<span style="color:#${ColorUtil.toHex(color)};">&#9632;</span>"""
 
     /** GitHub picks label colors against a white page, so lift them when the surface is dark. */
-    private fun labelTint(label: IssueLabel, background: Color): Color {
+    private fun labelTint(
+        label: IssueLabel,
+        background: Color,
+    ): Color {
         val base = label.color?.let { ColorUtil.fromHex(it, null) } ?: NEUTRAL_LABEL
         return if (ColorUtil.isDark(background)) ColorUtil.brighter(base, 1) else base
     }
 
-    private fun renderTrailing(value: Issue, grayed: SimpleTextAttributes) {
+    private fun renderTrailing(
+        value: Issue,
+        grayed: SimpleTextAttributes,
+    ) {
         stateText.clear()
         stateText.append(stateLabel(value.state), grayed)
 
         // Prefer the assignee; fall back to the author, keeping login and avatar url in step.
-        val (account, avatarUrl) = if (value.assignee != null) {
-            value.assignee to value.assigneeAvatarUrl
-        } else {
-            value.author to value.authorAvatarUrl
-        }
+        val (account, avatarUrl) =
+            if (value.assignee != null) {
+                value.assignee to value.assigneeAvatarUrl
+            } else {
+                value.author to value.authorAvatarUrl
+            }
         avatar.icon = account?.let { avatarLoader.avatar(avatarUrl, IssueAvatarIcon(it)) }
         avatar.toolTipText = value.assignee
             ?.let { IssueHubBundle["issue.assignedTo", it] }
@@ -188,24 +203,32 @@ internal class IssueCellRenderer(
         }
     }
 
-    private fun stateLabel(state: IssueState): String = when (state) {
-        IssueState.OPEN -> IssueHubBundle["issue.state.open"]
-        IssueState.CLOSED -> IssueHubBundle["issue.state.closed"]
-        IssueState.OTHER -> IssueHubBundle["issue.state.other"]
-    }
+    private fun stateLabel(state: IssueState): String =
+        when (state) {
+            IssueState.OPEN -> IssueHubBundle["issue.state.open"]
+            IssueState.CLOSED -> IssueHubBundle["issue.state.closed"]
+            IssueState.OTHER -> IssueHubBundle["issue.state.other"]
+        }
 
     private fun formatDate(timestamp: String): String? =
         runCatching { DateFormatUtil.formatDate(Instant.parse(timestamp).toEpochMilli()) }.getOrNull()
 
-    private fun attributes(base: SimpleTextAttributes, selected: Boolean, hasFocus: Boolean): SimpleTextAttributes =
-        if (selected) base.derive(-1, UIUtil.getListForeground(true, hasFocus), null, null) else base
+    private fun attributes(
+        base: SimpleTextAttributes,
+        selected: Boolean,
+        hasFocus: Boolean,
+    ): SimpleTextAttributes = if (selected) base.derive(-1, UIUtil.getListForeground(true, hasFocus), null, null) else base
 
     /**
      * Lays the title out left-to-right with its badges glued directly after it.
      */
-    private class TitleRowLayout(private val gap: Int) : LayoutManager {
-
-        override fun addLayoutComponent(name: String?, comp: Component) = Unit
+    private class TitleRowLayout(
+        private val gap: Int,
+    ) : LayoutManager {
+        override fun addLayoutComponent(
+            name: String?,
+            comp: Component,
+        ) = Unit
 
         override fun removeLayoutComponent(comp: Component) = Unit
 
@@ -222,8 +245,7 @@ internal class IssueCellRenderer(
         }
 
         /** The title may collapse entirely; the row must never force the list wider. */
-        override fun minimumLayoutSize(parent: Container) =
-            Dimension(0, preferredLayoutSize(parent).height)
+        override fun minimumLayoutSize(parent: Container) = Dimension(0, preferredLayoutSize(parent).height)
 
         override fun layoutContainer(parent: Container) {
             val components = visible(parent)
@@ -285,39 +307,41 @@ internal class IssueCellRenderer(
         /** Fallback for labels the API returned without a color. */
         val NEUTRAL_LABEL = JBColor(Color(0x9AA7B0), Color(0x6C707E))
 
-        fun borderless() = SimpleColoredComponent().apply {
-            isOpaque = false
-            ipad = JBUI.emptyInsets()
-            setMyBorder(null)
-        }
+        fun borderless() =
+            SimpleColoredComponent().apply {
+                isOpaque = false
+                ipad = JBUI.emptyInsets()
+                setMyBorder(null)
+            }
 
-        fun transparentPanel(layout: java.awt.LayoutManager) =
-            JBPanel<JBPanel<*>>(layout).apply { isOpaque = false }
+        fun transparentPanel(layout: java.awt.LayoutManager) = JBPanel<JBPanel<*>>(layout).apply { isOpaque = false }
 
         /** Label names are arbitrary text; keep them from breaking the tooltip's HTML. */
-        fun escapeHtml(text: String): String = text
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
+        fun escapeHtml(text: String): String =
+            text
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
 
         /** Baked tag swatches keyed by ARGB; Swing's tooltip HTML loads images by file URL. */
         private val swatchCache = HashMap<Int, String?>()
 
         /** Renders [IssueLabelIcon] to a cached temp PNG and returns its URL, or null on failure. */
-        fun swatchImageUrl(color: Color): String? = swatchCache.getOrPut(color.rgb) {
-            runCatching {
-                val icon = IssueLabelIcon(color)
-                val image = ImageUtil.createImage(icon.iconWidth, icon.iconHeight, BufferedImage.TYPE_INT_ARGB)
-                val g = image.createGraphics()
-                try {
-                    icon.paintIcon(null, g, 0, 0)
-                } finally {
-                    g.dispose()
-                }
-                val file = File.createTempFile("issuehub-label-", ".png").apply { deleteOnExit() }
-                ImageIO.write(image, "png", file)
-                file.toURI().toString()
-            }.getOrNull()
-        }
+        fun swatchImageUrl(color: Color): String? =
+            swatchCache.getOrPut(color.rgb) {
+                runCatching {
+                    val icon = IssueLabelIcon(color)
+                    val image = ImageUtil.createImage(icon.iconWidth, icon.iconHeight, BufferedImage.TYPE_INT_ARGB)
+                    val g = image.createGraphics()
+                    try {
+                        icon.paintIcon(null, g, 0, 0)
+                    } finally {
+                        g.dispose()
+                    }
+                    val file = File.createTempFile("issuehub-label-", ".png").apply { deleteOnExit() }
+                    ImageIO.write(image, "png", file)
+                    file.toURI().toString()
+                }.getOrNull()
+            }
     }
 }

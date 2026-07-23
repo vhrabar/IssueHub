@@ -16,14 +16,16 @@ interface IssueProvider {
     fun sourceLabel(project: Project): String?
 
     /** fetch issues for [project] */
-    suspend fun fetchIssues(project: Project, query: IssueQuery): List<Issue>
+    suspend fun fetchIssues(
+        project: Project,
+        query: IssueQuery,
+    ): List<Issue>
 
     companion object {
         val EP_NAME: ExtensionPointName<IssueProvider> =
             ExtensionPointName.create("com.github.vhrabar.issuehub.issueProvider")
 
         /** First provider that applies to [project], or null if none is configured. */
-        fun firstApplicable(project: Project): IssueProvider? =
-            EP_NAME.extensionList.firstOrNull { it.isApplicable(project) }
+        fun firstApplicable(project: Project): IssueProvider? = EP_NAME.extensionList.firstOrNull { it.isApplicable(project) }
     }
 }

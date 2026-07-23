@@ -34,9 +34,7 @@ internal data class GitHubIssueDto(
     @SerialName("html_url") val htmlUrl: String,
     @SerialName("created_at") val createdAt: String,
     @SerialName("updated_at") val updatedAt: String,
-
     @SerialName("pull_request") val pullRequest: GitHubPullRequestRefDto? = null,
 ) {
     val isPullRequest: Boolean get() = pullRequest != null
 }
-
