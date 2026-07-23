@@ -21,13 +21,18 @@ import com.intellij.util.ui.JBUI
 import kotlinx.coroutines.runBlocking
 import java.awt.BorderLayout
 import java.awt.CardLayout
+import java.awt.Component
+import java.awt.Container
 import java.awt.FlowLayout
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.DefaultListModel
 import javax.swing.JButton
+import javax.swing.JComponent
 import javax.swing.ListSelectionModel
 import javax.swing.ScrollPaneConstants
+import javax.swing.SwingUtilities
+import javax.swing.ToolTipManager
 
 class IssueHubToolWindowFactory : ToolWindowFactory {
 
@@ -43,9 +48,23 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         JBPanel<IssueHubToolWindowPanel>(BorderLayout()) {
 
         private val listModel = DefaultListModel<Issue>()
-        private val issueList = JBList(listModel).apply {
+        private val issueList = object : JBList<Issue>(listModel) {
+            override fun getToolTipText(event: MouseEvent): String? {
+                val index = locationToIndex(event.point)
+                if (index < 0) return null
+                val bounds = getCellBounds(index, index)?.takeIf { it.contains(event.point) } ?: return null
+                val renderer = cellRenderer.getListCellRendererComponent(
+                    this, model.getElementAt(index), index, false, false,
+                ) as? JComponent ?: return null
+                renderer.bounds = bounds
+                layoutTree(renderer)
+                val target = SwingUtilities.getDeepestComponentAt(renderer, event.x - bounds.x, event.y - bounds.y)
+                return (target as? JComponent)?.toolTipText
+            }
+        }.apply {
             selectionMode = ListSelectionModel.SINGLE_SELECTION
             cellRenderer = IssueCellRenderer()
+            ToolTipManager.sharedInstance().registerComponent(this)
         }
 
         // CENTER swaps between a status message and the issue list.
@@ -150,4 +169,10 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             const val LIST_CARD = "list"
         }
     }
+}
+
+/** Recursively runs each container's layout so a detached renderer tree has valid child bounds. */
+private fun layoutTree(component: Component) {
+    component.doLayout()
+    if (component is Container) component.components.forEach(::layoutTree)
 }

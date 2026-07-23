@@ -2,6 +2,7 @@ package com.github.vhrabar.issuehub.toolWindow
 
 import com.github.vhrabar.issuehub.IssueHubBundle
 import com.github.vhrabar.issuehub.model.Issue
+import com.github.vhrabar.issuehub.model.IssueLabel
 import com.github.vhrabar.issuehub.model.IssueState
 import com.intellij.icons.AllIcons
 import com.intellij.ui.ColorUtil
@@ -11,6 +12,7 @@ import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.util.text.DateFormatUtil
+import com.intellij.util.ui.ImageUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
@@ -21,7 +23,10 @@ import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.Graphics2D
 import java.awt.LayoutManager
+import java.awt.image.BufferedImage
+import java.io.File
 import java.time.Instant
+import javax.imageio.ImageIO
 import javax.swing.JList
 import javax.swing.ListCellRenderer
 
@@ -114,11 +119,35 @@ internal class IssueCellRenderer : JBPanel<IssueCellRenderer>(BorderLayout()), L
             labelIcon.toolTipText = null
             return
         }
-        // GitHub picks label colors against a white page, so lift them on a dark row.
-        val tint = first.color?.let { ColorUtil.fromHex(it, null) }
-            ?.let { if (ColorUtil.isDark(UIUtil.getListBackground(selected, hasFocus))) ColorUtil.brighter(it, 1) else it }
-        labelIcon.icon = IssueLabelIcon(tint ?: NEUTRAL_LABEL)
-        labelIcon.toolTipText = value.labels.joinToString(", ") { it.name }
+        labelIcon.icon = IssueLabelIcon(labelTint(first, UIUtil.getListBackground(selected, hasFocus)))
+        labelIcon.toolTipText = labelsTooltip(value.labels)
+    }
+
+    /**
+     * A titled list with the tag-shaped swatch left of each label name. Swing renders tooltip HTML,
+     * so each swatch is the row's own [IssueLabelIcon] baked to a PNG, tinted against the tooltip
+     * background the same way the row icon is tinted.
+     */
+    private fun labelsTooltip(labels: List<IssueLabel>): String {
+        val background = UIUtil.getToolTipBackground()
+        // A borderless table keeps the swatch and name vertically centered against each row's height.
+        val rows = labels.joinToString("") { label ->
+            "<tr><td valign='middle'>${labelSwatch(labelTint(label, background))}</td>" +
+                "<td valign='middle'>&nbsp;${escapeHtml(label.name)}</td></tr>"
+        }
+        return "<html><b>${escapeHtml(IssueHubBundle["issue.labels.title"])}</b>" +
+            "<table cellpadding='0' cellspacing='0'>$rows</table></html>"
+    }
+
+    /** The tag icon as an inline image, falling back to a colored square if it can't be baked. */
+    private fun labelSwatch(color: Color): String =
+        swatchImageUrl(color)?.let { """<img src="$it">""" }
+            ?: """<span style="color:#${ColorUtil.toHex(color)};">&#9632;</span>"""
+
+    /** GitHub picks label colors against a white page, so lift them when the surface is dark. */
+    private fun labelTint(label: IssueLabel, background: Color): Color {
+        val base = label.color?.let { ColorUtil.fromHex(it, null) } ?: NEUTRAL_LABEL
+        return if (ColorUtil.isDark(background)) ColorUtil.brighter(base, 1) else base
     }
 
     private fun renderTrailing(value: Issue, grayed: SimpleTextAttributes) {
@@ -257,5 +286,31 @@ internal class IssueCellRenderer : JBPanel<IssueCellRenderer>(BorderLayout()), L
 
         fun transparentPanel(layout: java.awt.LayoutManager) =
             JBPanel<JBPanel<*>>(layout).apply { isOpaque = false }
+
+        /** Label names are arbitrary text; keep them from breaking the tooltip's HTML. */
+        fun escapeHtml(text: String): String = text
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+
+        /** Baked tag swatches keyed by ARGB; Swing's tooltip HTML loads images by file URL. */
+        private val swatchCache = HashMap<Int, String?>()
+
+        /** Renders [IssueLabelIcon] to a cached temp PNG and returns its URL, or null on failure. */
+        fun swatchImageUrl(color: Color): String? = swatchCache.getOrPut(color.rgb) {
+            runCatching {
+                val icon = IssueLabelIcon(color)
+                val image = ImageUtil.createImage(icon.iconWidth, icon.iconHeight, BufferedImage.TYPE_INT_ARGB)
+                val g = image.createGraphics()
+                try {
+                    icon.paintIcon(null, g, 0, 0)
+                } finally {
+                    g.dispose()
+                }
+                val file = File.createTempFile("issuehub-label-", ".png").apply { deleteOnExit() }
+                ImageIO.write(image, "png", file)
+                file.toURI().toString()
+            }.getOrNull()
+        }
     }
 }
