@@ -98,6 +98,31 @@ internal class IssueLabelIcon(private val color: Color) : Icon {
     }
 }
 
+/** A downloaded avatar image, clipped to a circle so it matches the initials fallback. */
+internal class CircularAvatarIcon(private val image: java.awt.Image) : Icon {
+
+    override fun getIconWidth(): Int = JBUI.scale(SIZE)
+
+    override fun getIconHeight(): Int = JBUI.scale(SIZE)
+
+    override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
+        val g2 = g.create() as Graphics2D
+        try {
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+            val size = JBUI.scale(SIZE)
+            g2.clip = Ellipse2D.Double(x.toDouble(), y.toDouble(), size.toDouble(), size.toDouble())
+            g2.drawImage(image, x, y, size, size, null)
+        } finally {
+            g2.dispose()
+        }
+    }
+
+    companion object {
+        const val SIZE = 16
+    }
+}
+
 /**
  * Initials avatar for an account, drawn locally from the login.
  *.
@@ -121,7 +146,7 @@ internal class IssueAvatarIcon(login: String) : Icon {
             g2.color = background
             g2.fill(Ellipse2D.Double(x.toDouble(), y.toDouble(), size.toDouble(), size.toDouble()))
 
-            g2.color = Color.WHITE
+            g2.color = JBColor.WHITE
             g2.font = JBUI.Fonts.label(FONT_SIZE).asBold()
             val text = initial.toString()
             val metrics = g2.fontMetrics
@@ -139,10 +164,8 @@ internal class IssueAvatarIcon(login: String) : Icon {
         const val SIZE = 16
         const val FONT_SIZE = 9f
 
-        /** Mid-tone hues that keep white initials readable in either theme. */
-        val PALETTE = listOf(
-            Color(0x4C7EBF), Color(0x3E8A6E), Color(0xA6683C),
-            Color(0x8A5FB0), Color(0xBF5B5B), Color(0x3F8296),
-        )
+        /** Mid-tone hues that keep white initials readable in either theme (same in light and dark). */
+        val PALETTE = listOf(0x4C7EBF, 0x3E8A6E, 0xA6683C, 0x8A5FB0, 0xBF5B5B, 0x3F8296)
+            .map { JBColor(Color(it), Color(it)) }
     }
 }

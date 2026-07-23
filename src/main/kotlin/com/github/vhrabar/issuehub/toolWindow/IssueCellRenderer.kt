@@ -35,7 +35,9 @@ import javax.swing.ListCellRenderer
  * creation date, author status & labels
  * */
 
-internal class IssueCellRenderer : JBPanel<IssueCellRenderer>(BorderLayout()), ListCellRenderer<Issue> {
+internal class IssueCellRenderer(
+    private val avatarLoader: AvatarLoader,
+) : JBPanel<IssueCellRenderer>(BorderLayout()), ListCellRenderer<Issue> {
 
     private val title = borderless()
     private val labelIcon = JBLabel()
@@ -154,8 +156,13 @@ internal class IssueCellRenderer : JBPanel<IssueCellRenderer>(BorderLayout()), L
         stateText.clear()
         stateText.append(stateLabel(value.state), grayed)
 
-        val account = value.assignee ?: value.author
-        avatar.icon = account?.let { IssueAvatarIcon(it) }
+        // Prefer the assignee; fall back to the author, keeping login and avatar url in step.
+        val (account, avatarUrl) = if (value.assignee != null) {
+            value.assignee to value.assigneeAvatarUrl
+        } else {
+            value.author to value.authorAvatarUrl
+        }
+        avatar.icon = account?.let { avatarLoader.avatar(avatarUrl, IssueAvatarIcon(it)) }
         avatar.toolTipText = value.assignee
             ?.let { IssueHubBundle["issue.assignedTo", it] }
             ?: value.author?.let { IssueHubBundle["issue.openedBy", it] }

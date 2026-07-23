@@ -65,9 +65,11 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             }
         }.apply {
             selectionMode = ListSelectionModel.SINGLE_SELECTION
-            cellRenderer = IssueCellRenderer()
             ToolTipManager.sharedInstance().registerComponent(this)
         }
+
+        // Repaints the list once an avatar finishes downloading so the real picture replaces initials.
+        private val avatarLoader = AvatarLoader(issueList::repaint)
 
         // CENTER swaps between a status message and the issue list.
         private val statusLabel = JBLabel(IssueHubBundle["toolWindow.placeholder"])
@@ -88,6 +90,7 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         }
 
         init {
+            issueList.cellRenderer = IssueCellRenderer(avatarLoader)
             add(buildToolbar(), BorderLayout.NORTH)
             add(center, BorderLayout.CENTER)
 
