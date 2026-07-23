@@ -27,6 +27,7 @@ import java.awt.event.MouseEvent
 import javax.swing.DefaultListModel
 import javax.swing.JButton
 import javax.swing.ListSelectionModel
+import javax.swing.ScrollPaneConstants
 
 class IssueHubToolWindowFactory : ToolWindowFactory {
 
@@ -55,7 +56,14 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                 border = JBUI.Borders.empty(10)
                 add(statusLabel, BorderLayout.NORTH)
             }, STATUS_CARD)
-            add(JBScrollPane(issueList), LIST_CARD)
+            // Rows ellipsize to the viewport width, so a horizontal scrollbar would never be useful.
+            add(
+                JBScrollPane(issueList).apply {
+                    horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
+                    border = JBUI.Borders.empty()
+                },
+                LIST_CARD,
+            )
         }
 
         init {

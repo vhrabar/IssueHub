@@ -1,29 +1,261 @@
 package com.github.vhrabar.issuehub.toolWindow
 
+import com.github.vhrabar.issuehub.IssueHubBundle
 import com.github.vhrabar.issuehub.model.Issue
 import com.github.vhrabar.issuehub.model.IssueState
-import com.intellij.ui.ColoredListCellRenderer
+import com.intellij.icons.AllIcons
+import com.intellij.ui.ColorUtil
+import com.intellij.ui.JBColor
+import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.SimpleTextAttributes
+import com.intellij.ui.components.JBLabel
+import com.intellij.ui.components.JBPanel
+import com.intellij.util.text.DateFormatUtil
+import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
+import java.awt.BorderLayout
+import java.awt.Color
+import java.awt.Component
+import java.awt.Container
+import java.awt.Dimension
+import java.awt.FlowLayout
+import java.awt.Graphics2D
+import java.awt.LayoutManager
+import java.time.Instant
 import javax.swing.JList
+import javax.swing.ListCellRenderer
 
-/** Renders an [Issue] as "#number  Title" with a state-tinted number. */
-internal class IssueCellRenderer : ColoredListCellRenderer<Issue>() {
-    override fun customizeCellRenderer(
+/**
+ * Renders an [Issue] as "#number  Title" with a state-tinted number.
+ * creation date, author status & labels
+ * */
+
+internal class IssueCellRenderer : JBPanel<IssueCellRenderer>(BorderLayout()), ListCellRenderer<Issue> {
+
+    private val title = borderless()
+    private val labelIcon = JBLabel()
+    private val stateText = borderless()
+    private val avatar = JBLabel()
+    private val comments = borderless()
+    private val meta = borderless()
+
+    private val trailing = transparentPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(6), 0)).apply {
+        add(stateText)
+        add(avatar)
+        add(comments)
+    }
+
+    private val titleRow = transparentPanel(TitleRowLayout(JBUI.scale(5))).apply {
+        add(title)
+        add(labelIcon)
+    }
+
+    private val topRow = transparentPanel(BorderLayout(JBUI.scale(8), 0)).apply {
+        add(titleRow, BorderLayout.CENTER)
+        add(trailing, BorderLayout.EAST)
+    }
+
+    /** Width the list can actually give this row; see [getPreferredSize]. */
+    private var availableWidth = 0
+
+    init {
+        border = JBUI.Borders.empty(5, 8)
+        add(topRow, BorderLayout.NORTH)
+        add(meta, BorderLayout.CENTER)
+    }
+
+    /**
+     * Rows must never ask for more width than the list has, otherwise [JList] sizes every cell to
+     * the longest title and the scroll pane grows a horizontal scrollbar instead of ellipsizing.
+     */
+    override fun getPreferredSize(): Dimension {
+        val size = super.getPreferredSize()
+        return if (availableWidth > 0) Dimension(availableWidth, size.height) else size
+    }
+
+    override fun getListCellRendererComponent(
         list: JList<out Issue>,
         value: Issue?,
         index: Int,
         selected: Boolean,
         hasFocus: Boolean,
-    ) {
-        value ?: return
-        val numberAttrs = when (value.state) {
+    ): Component {
+        isOpaque = true
+        background = UIUtil.getListBackground(selected, hasFocus)
+        availableWidth = list.width - JBUI.scale(1) - (list.insets.left + list.insets.right)
+        value ?: return this
 
-            IssueState.CLOSED -> SimpleTextAttributes.GRAYED_ATTRIBUTES
-            else -> SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES
+        val regular = attributes(SimpleTextAttributes.REGULAR_ATTRIBUTES, selected, hasFocus)
+        val grayed = attributes(SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES, selected, hasFocus)
+
+        title.clear()
+        title.icon = IssueStateIcon(value.state)
+        title.iconTextGap = JBUI.scale(6)
+        title.appendWithClipping(value.title, regular, EllipsisClipper)
+        title.toolTipText = value.title
+
+        renderLabels(value, selected, hasFocus)
+        renderTrailing(value, grayed)
+
+        meta.clear()
+        meta.append(metaText(value), grayed)
+
+        return this
+    }
+
+    /**
+     * Labels collapse to a single tag icon tinted with the first label's color.
+     */
+    private fun renderLabels(value: Issue, selected: Boolean, hasFocus: Boolean) {
+        val first = value.labels.firstOrNull()
+        labelIcon.isVisible = first != null
+        if (first == null) {
+            labelIcon.icon = null
+            labelIcon.toolTipText = null
+            return
         }
-        append(value.displayNumber, numberAttrs)
-        append("  ")
-        append(value.title, SimpleTextAttributes.REGULAR_ATTRIBUTES)
-        value.assignee?.let { append("  @$it", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES) }
+        // GitHub picks label colors against a white page, so lift them on a dark row.
+        val tint = first.color?.let { ColorUtil.fromHex(it, null) }
+            ?.let { if (ColorUtil.isDark(UIUtil.getListBackground(selected, hasFocus))) ColorUtil.brighter(it, 1) else it }
+        labelIcon.icon = IssueLabelIcon(tint ?: NEUTRAL_LABEL)
+        labelIcon.toolTipText = value.labels.joinToString(", ") { it.name }
+    }
+
+    private fun renderTrailing(value: Issue, grayed: SimpleTextAttributes) {
+        stateText.clear()
+        stateText.append(stateLabel(value.state), grayed)
+
+        val account = value.assignee ?: value.author
+        avatar.icon = account?.let { IssueAvatarIcon(it) }
+        avatar.toolTipText = value.assignee
+            ?.let { IssueHubBundle["issue.assignedTo", it] }
+            ?: value.author?.let { IssueHubBundle["issue.openedBy", it] }
+
+        comments.clear()
+        if (value.commentCount > 0) {
+            comments.icon = AllIcons.General.Balloon
+            comments.iconTextGap = JBUI.scale(3)
+            comments.append(value.commentCount.toString(), grayed)
+        } else {
+            comments.icon = null
+        }
+    }
+
+    private fun metaText(value: Issue): String {
+        val created = formatDate(value.createdAt)
+        return when {
+            value.author != null && created != null ->
+                IssueHubBundle["issue.meta.createdBy", value.displayNumber, created, value.author]
+            created != null -> IssueHubBundle["issue.meta.created", value.displayNumber, created]
+            value.author != null -> IssueHubBundle["issue.meta.by", value.displayNumber, value.author]
+            else -> value.displayNumber
+        }
+    }
+
+    private fun stateLabel(state: IssueState): String = when (state) {
+        IssueState.OPEN -> IssueHubBundle["issue.state.open"]
+        IssueState.CLOSED -> IssueHubBundle["issue.state.closed"]
+        IssueState.OTHER -> IssueHubBundle["issue.state.other"]
+    }
+
+    private fun formatDate(timestamp: String): String? =
+        runCatching { DateFormatUtil.formatDate(Instant.parse(timestamp).toEpochMilli()) }.getOrNull()
+
+    private fun attributes(base: SimpleTextAttributes, selected: Boolean, hasFocus: Boolean): SimpleTextAttributes =
+        if (selected) base.derive(-1, UIUtil.getListForeground(true, hasFocus), null, null) else base
+
+    /**
+     * Lays the title out left-to-right with its badges glued directly after it.
+     */
+    private class TitleRowLayout(private val gap: Int) : LayoutManager {
+
+        override fun addLayoutComponent(name: String?, comp: Component) = Unit
+
+        override fun removeLayoutComponent(comp: Component) = Unit
+
+        override fun preferredLayoutSize(parent: Container): Dimension {
+            val insets = parent.insets
+            var width = 0
+            var height = 0
+            visible(parent).forEachIndexed { index, c ->
+                if (index > 0) width += gap
+                width += c.preferredSize.width
+                height = maxOf(height, c.preferredSize.height)
+            }
+            return Dimension(width + insets.left + insets.right, height + insets.top + insets.bottom)
+        }
+
+        /** The title may collapse entirely; the row must never force the list wider. */
+        override fun minimumLayoutSize(parent: Container) =
+            Dimension(0, preferredLayoutSize(parent).height)
+
+        override fun layoutContainer(parent: Container) {
+            val components = visible(parent)
+            if (components.isEmpty()) return
+
+            val insets = parent.insets
+            val available = parent.width - insets.left - insets.right
+            val height = parent.height - insets.top - insets.bottom
+
+            val title = components.first()
+            val badges = components.drop(1)
+            val badgesWidth = badges.sumOf { it.preferredSize.width + gap }
+            val titleWidth = (available - badgesWidth).coerceIn(0, title.preferredSize.width)
+
+            var x = insets.left
+            title.setBounds(x, insets.top, titleWidth, height)
+            x += titleWidth
+            badges.forEach {
+                x += gap
+                val size = it.preferredSize
+                it.setBounds(x, insets.top + (height - size.height) / 2, size.width, size.height)
+                x += size.width
+            }
+        }
+
+        private fun visible(parent: Container) = parent.components.filter { it.isVisible }
+    }
+
+    /** Trims an over-long fragment to the width the painter has left, with a trailing ellipsis. */
+    private object EllipsisClipper : SimpleColoredComponent.FragmentTextClipper {
+        private const val ELLIPSIS = "…"
+
+        override fun clipText(
+            component: SimpleColoredComponent,
+            g2: Graphics2D,
+            fragmentIndex: Int,
+            text: String,
+            availTextWidth: Int,
+        ): String {
+            val metrics = g2.fontMetrics
+            if (availTextWidth <= 0) return ""
+            if (metrics.stringWidth(text) <= availTextWidth) return text
+
+            val budget = availTextWidth - metrics.stringWidth(ELLIPSIS)
+            if (budget <= 0) return ELLIPSIS
+
+            // Binary search the longest prefix that fits; clipText runs on every repaint.
+            var low = 0
+            var high = text.length
+            while (low < high) {
+                val mid = (low + high + 1) / 2
+                if (metrics.stringWidth(text.substring(0, mid)) <= budget) low = mid else high = mid - 1
+            }
+            return text.take(low).trimEnd() + ELLIPSIS
+        }
+    }
+
+    private companion object {
+        /** Fallback for labels the API returned without a color. */
+        val NEUTRAL_LABEL = JBColor(Color(0x9AA7B0), Color(0x6C707E))
+
+        fun borderless() = SimpleColoredComponent().apply {
+            isOpaque = false
+            ipad = JBUI.emptyInsets()
+            setMyBorder(null)
+        }
+
+        fun transparentPanel(layout: java.awt.LayoutManager) =
+            JBPanel<JBPanel<*>>(layout).apply { isOpaque = false }
     }
 }
