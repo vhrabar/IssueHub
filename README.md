@@ -18,9 +18,6 @@ repository from a dedicated tool window, without leaving your editor.
 - Opens any issue in the browser with a double-click
 - Stores your GitHub token in the IDE's secure credential store
 
-**Getting started:** open the **IssueHub** tool window, click **Add Token…** to paste a GitHub
-personal access token (read-only scope is enough), then click **Refresh**. Public repositories work
-without a token.
 <!-- Plugin description end -->
 
 ## Usage (Alpha)
