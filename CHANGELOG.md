@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.0.3] - 2026-07-24
+
 ### Added
 
 - Issue rows now show the author, creation date, labels and open/closed state instead of just the title.
@@ -26,6 +28,7 @@
 ### Compatibility
 
 - Verified against IntelliJ Platform 2025.2 through 2026.2
+
 ## [0.0.2] - 2026-07-21
 
 ### Added
@@ -46,5 +49,6 @@
 
 - Verified against IntelliJ Platform 2025.2 through 2026.2
 
-[Unreleased]: https://github.com/vhrabar/IssueHub/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/vhrabar/IssueHub/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/vhrabar/IssueHub/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/vhrabar/IssueHub/commits/v0.0.2
