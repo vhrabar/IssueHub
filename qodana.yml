@@ -1,0 +1,13 @@
+# Qodana configuration: https://www.jetbrains.com/help/qodana/qodana-yaml.html
+# Runs the same inspections as the IDE (e.g. UseJBColor) headlessly in CI.
+version: "1.0"
+
+# JVM community linter is enough for a Kotlin plugin; bump the tag to match your IDE line.
+linter: jetbrains/qodana-jvm-community:2026.1
+
+# Recommended profile: a balanced set of inspections without the noisiest ones.
+profile:
+  name: qodana.recommended
+
+# Fail the CI run when new problems are introduced above these thresholds.
+failThreshold: 0

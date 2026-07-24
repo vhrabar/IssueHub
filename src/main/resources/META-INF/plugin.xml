@@ -20,6 +20,7 @@
         <toolWindow
             id="IssueHub"
             anchor="left"
+            icon="/icons/issueHub.svg"
             factoryClass="com.github.vhrabar.issuehub.toolWindow.IssueHubToolWindowFactory"/>
     </extensions>
 
