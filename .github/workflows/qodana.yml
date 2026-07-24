@@ -41,3 +41,4 @@ jobs:
         uses: JetBrains/qodana-action@v2026.1
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+          QODANA_JVM_ARGS: -Dorg.gradle.java.home=$JAVA_HOME
