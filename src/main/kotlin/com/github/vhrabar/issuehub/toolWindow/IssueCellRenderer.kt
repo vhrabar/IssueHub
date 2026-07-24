@@ -314,7 +314,7 @@ internal class IssueCellRenderer(
                 setMyBorder(null)
             }
 
-        fun transparentPanel(layout: java.awt.LayoutManager) = JBPanel<JBPanel<*>>(layout).apply { isOpaque = false }
+        fun transparentPanel(layout: LayoutManager) = JBPanel<JBPanel<*>>(layout).apply { isOpaque = false }
 
         /** Label names are arbitrary text; keep them from breaking the tooltip's HTML. */
         fun escapeHtml(text: String): String =

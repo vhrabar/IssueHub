@@ -13,11 +13,11 @@ object IssueHubBundle : DynamicBundle(BUNDLE) {
         vararg params: Any,
     ) = getMessage(key, *params)
 
-    @JvmStatic
+    /*@JvmStatic
     fun message(
         @PropertyKey(resourceBundle = BUNDLE) key: String,
         vararg params: Any,
-    ) = getMessage(key, *params)
+    ) = getMessage(key, *params)*/
 
     @Suppress("unused")
     @JvmStatic
