@@ -1,0 +1,49 @@
+<svg width="1280" height="320" viewBox="0 0 1280 320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgL" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbfaff"></stop>
+      <stop offset="60%" stop-color="#f2f0fa"></stop>
+      <stop offset="100%" stop-color="#ece9f7"></stop>
+    </linearGradient>
+    <radialGradient id="bannerGlowL" cx="60%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#5b4cb8" stop-opacity="0.10"></stop>
+      <stop offset="100%" stop-color="#5b4cb8" stop-opacity="0"></stop>
+    </radialGradient>
+    <radialGradient id="hubGlowL" cx="50%" cy="46%" r="55%">
+      <stop offset="0%" stop-color="#9184d9" stop-opacity="0.5"></stop>
+      <stop offset="100%" stop-color="#9184d9" stop-opacity="0"></stop>
+    </radialGradient>
+    <linearGradient id="plateGradL" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"></stop>
+      <stop offset="100%" stop-color="#eeecf7"></stop>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="320" fill="url(#bgL)"></rect>
+  <rect width="1280" height="320" fill="url(#bannerGlowL)"></rect>
+
+  <g transform="translate(72,72)">
+    <rect x="2" y="2" width="124" height="124" rx="26" fill="url(#plateGradL)"></rect>
+    <rect x="2" y="2" width="124" height="124" rx="26" fill="none" stroke="#d7d3ea" stroke-width="1"></rect>
+    <circle cx="64" cy="60" r="46" fill="url(#hubGlowL)"></circle>
+    <line x1="64" y1="60" x2="64" y2="28" stroke="#6f63c9" stroke-width="2.5" stroke-linecap="round"></line>
+    <line x1="64" y1="60" x2="93" y2="45" stroke="#6f63c9" stroke-width="2.5" stroke-linecap="round"></line>
+    <line x1="64" y1="60" x2="93" y2="78" stroke="#6f63c9" stroke-width="2.5" stroke-linecap="round"></line>
+    <line x1="64" y1="60" x2="64" y2="94" stroke="#6f63c9" stroke-width="2.5" stroke-linecap="round"></line>
+    <line x1="64" y1="60" x2="35" y2="78" stroke="#6f63c9" stroke-width="2.5" stroke-linecap="round"></line>
+    <line x1="64" y1="60" x2="35" y2="45" stroke="#6f63c9" stroke-width="2.5" stroke-linecap="round"></line>
+    <circle cx="64" cy="28" r="6" fill="#5b4cb8"></circle>
+    <circle cx="93" cy="45" r="6" fill="#5b4cb8"></circle>
+    <circle cx="93" cy="78" r="6" fill="#5b4cb8"></circle>
+    <circle cx="64" cy="94" r="6" fill="#5b4cb8"></circle>
+    <circle cx="35" cy="78" r="6" fill="#5b4cb8"></circle>
+    <circle cx="35" cy="45" r="6" fill="#5b4cb8"></circle>
+    <circle cx="64" cy="60" r="12" fill="#fbfaff" stroke="#6f63c9" stroke-width="2"></circle>
+    <circle cx="64" cy="60" r="4.5" fill="#221c3d"></circle>
+  </g>
+
+  <g transform="translate(248,0)" font-family="Inter, -apple-system, Segoe UI, sans-serif">
+    <text x="0" y="172" font-size="72" font-weight="500" letter-spacing="-1" fill="#221c3d">Issue<tspan fill="#5b4cb8">Hub</tspan></text>
+    <text x="0" y="212" font-size="22" fill="#5a5570">Where every issue finds its hub, right inside your IDE.</text>
+  </g>
+</svg>

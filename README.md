@@ -1,3 +1,8 @@
+<!-- Light mode -->
+![Logo (light)](assets/issuehub-banner-light.svg#gh-light-mode-only)
+
+<!-- Dark mode -->
+![Logo (dark)](assets/issuehub-banner-dark.svg#gh-dark-mode-only)
 # IssueHub
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/vhrabar/IssueHub/build.yml?style=for-the-badge)
