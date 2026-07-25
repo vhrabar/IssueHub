@@ -42,7 +42,15 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
     ) {
         val panel = IssueHubToolWindowPanel(project)
         toolWindow.component.putClientProperty(ToolWindowContentUi.HIDE_ID_LABEL, "true")
-        val content = ContentFactory.getInstance().createContent(panel, IssueHubBundle["toolWindow.title"], false)
+
+        val source = IssueProvider.firstApplicable(project)?.sourceLabel(project)
+        val content =
+            ContentFactory.getInstance().createContent(
+                panel,
+                source?.substringAfterLast('/') ?: IssueHubBundle["toolWindow.title"],
+                false,
+            )
+        content.description = source
         toolWindow.contentManager.addContent(content)
     }
 
