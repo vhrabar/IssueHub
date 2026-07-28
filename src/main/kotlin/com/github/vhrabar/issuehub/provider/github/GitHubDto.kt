@@ -16,8 +16,20 @@ internal data class GitHubUserDto(
 )
 
 @Serializable
+internal data class GitHubMilestoneDto(
+    val number: Int,
+    val title: String,
+)
+
+@Serializable
 internal data class GitHubPullRequestRefDto(
     val url: String? = null,
+)
+
+/** `/search/issues` wraps the same issue objects in a result envelope. */
+@Serializable
+internal data class GitHubSearchResultDto(
+    val items: List<GitHubIssueDto> = emptyList(),
 )
 
 /** Wire model for the GitHub REST API */
@@ -29,6 +41,7 @@ internal data class GitHubIssueDto(
     val body: String? = null,
     val labels: List<GitHubLabelDto> = emptyList(),
     val assignee: GitHubUserDto? = null,
+    val milestone: GitHubMilestoneDto? = null,
     val user: GitHubUserDto? = null,
     val comments: Int = 0,
     @SerialName("html_url") val htmlUrl: String,
