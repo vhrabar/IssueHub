@@ -1,6 +1,7 @@
 package com.github.vhrabar.issuehub.provider
 
 import com.github.vhrabar.issuehub.model.Issue
+import com.github.vhrabar.issuehub.model.IssueFilterOptions
 import com.github.vhrabar.issuehub.model.IssueQuery
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
@@ -20,6 +21,9 @@ interface IssueProvider {
         project: Project,
         query: IssueQuery,
     ): List<Issue>
+
+    /** values the filter UI can offer; empty when the provider can't enumerate them */
+    suspend fun fetchFilterOptions(project: Project): IssueFilterOptions = IssueFilterOptions()
 
     companion object {
         val EP_NAME: ExtensionPointName<IssueProvider> =
