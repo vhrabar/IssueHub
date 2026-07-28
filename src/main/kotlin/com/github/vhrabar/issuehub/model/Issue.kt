@@ -8,6 +8,16 @@ data class IssueLabel(
     val color: String? = null,
 )
 
+/**
+ * A milestone an issue can belong to.
+ *
+ * [number] is the provider's own identifier
+ */
+data class IssueMilestone(
+    val number: Int,
+    val title: String,
+)
+
 /** Provider-neutral repr. of tracked issues */
 data class Issue(
     val id: Int,
@@ -18,16 +28,11 @@ data class Issue(
     val labels: List<IssueLabel> = emptyList(),
     val assignee: String? = null,
     val assigneeAvatarUrl: String? = null,
+    val milestone: IssueMilestone? = null,
     val author: String? = null,
     val authorAvatarUrl: String? = null,
     val commentCount: Int = 0,
     val url: String,
     val createdAt: String,
     val updatedAt: String,
-)
-
-// placeholder for queries (50 last opened)
-data class IssueQuery(
-    val state: IssueState = IssueState.OPEN,
-    val limit: Int = 50,
 )
