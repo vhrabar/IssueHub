@@ -55,3 +55,84 @@ data class IssueDetail(
     val issue: Issue,
     val bodyHtml: String? = null,
 )
+
+/**
+ * One entry in an issue's history
+ */
+sealed interface IssueTimelineItem {
+    val actor: IssueActor?
+    val at: String
+
+    /** Someone wrote a comment. [bodyHtml] follows the same rules as [IssueDetail.bodyHtml]. */
+    data class Comment(
+        override val actor: IssueActor?,
+        override val at: String,
+        val body: String? = null,
+        val bodyHtml: String? = null,
+        val url: String? = null,
+        val edited: Boolean = false,
+    ) : IssueTimelineItem
+
+    /** The issue was closed or reopened; [reason] is the provider's wording, when it gives one. */
+    data class StateChange(
+        override val actor: IssueActor?,
+        override val at: String,
+        val state: IssueState,
+        val reason: String? = null,
+    ) : IssueTimelineItem
+
+    data class LabelChange(
+        override val actor: IssueActor?,
+        override val at: String,
+        val label: IssueLabel,
+        val added: Boolean,
+    ) : IssueTimelineItem
+
+    data class AssigneeChange(
+        override val actor: IssueActor?,
+        override val at: String,
+        val assignee: IssueActor,
+        val added: Boolean,
+    ) : IssueTimelineItem
+
+    data class MilestoneChange(
+        override val actor: IssueActor?,
+        override val at: String,
+        val milestone: IssueMilestone,
+        val added: Boolean,
+    ) : IssueTimelineItem
+
+    data class Renamed(
+        override val actor: IssueActor?,
+        override val at: String,
+        val from: String,
+        val to: String,
+    ) : IssueTimelineItem
+
+    /** Another issue or pull request linked to this one. */
+    data class CrossReferenced(
+        override val actor: IssueActor?,
+        override val at: String,
+        val displayNumber: String,
+        val title: String,
+        val url: String,
+        val isPullRequest: Boolean,
+    ) : IssueTimelineItem
+
+    /** A commit referenced the issue. */
+    data class Referenced(
+        override val actor: IssueActor?,
+        override val at: String,
+        val commitSha: String,
+        val commitUrl: String? = null,
+    ) : IssueTimelineItem
+
+    /**
+     * An entry we can't be modeled. [kind] keeps the provider's own name for it
+     */
+    data class Unknown(
+        override val actor: IssueActor?,
+        override val at: String,
+        val kind: String,
+    ) : IssueTimelineItem
+}
