@@ -18,6 +18,16 @@ data class IssueMilestone(
     val title: String,
 )
 
+/**
+ * Generalized issue actor,  author, an assignee, or the actor behind a
+ * timeline event. [login] identifies the account and is what filters match on;
+ * [avatarUrl] is null when the provider doesn't publish a picture.
+ */
+data class IssueActor(
+    val login: String,
+    val avatarUrl: String? = null,
+)
+
 /** Provider-neutral repr. of tracked issues */
 data class Issue(
     val id: Int,
@@ -26,11 +36,9 @@ data class Issue(
     val state: IssueState,
     val body: String? = null,
     val labels: List<IssueLabel> = emptyList(),
-    val assignee: String? = null,
-    val assigneeAvatarUrl: String? = null,
+    val assignee: IssueActor? = null,
     val milestone: IssueMilestone? = null,
-    val author: String? = null,
-    val authorAvatarUrl: String? = null,
+    val author: IssueActor? = null,
     val commentCount: Int = 0,
     val url: String,
     val createdAt: String,

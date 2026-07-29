@@ -83,7 +83,7 @@ data class IssueFilterOptions(
 fun optionsFrom(issues: List<Issue>): IssueFilterOptions =
     IssueFilterOptions(
         labels = issues.flatMap { it.labels },
-        assignees = issues.mapNotNull { it.assignee },
+        assignees = issues.mapNotNull { it.assignee?.login },
         milestones = issues.mapNotNull { it.milestone },
-        authors = issues.mapNotNull { it.author },
+        authors = issues.mapNotNull { it.author?.login },
     ).mergedWith(IssueFilterOptions())

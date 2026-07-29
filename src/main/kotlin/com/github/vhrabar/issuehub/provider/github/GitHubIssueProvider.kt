@@ -1,6 +1,7 @@
 package com.github.vhrabar.issuehub.provider.github
 
 import com.github.vhrabar.issuehub.model.Issue
+import com.github.vhrabar.issuehub.model.IssueActor
 import com.github.vhrabar.issuehub.model.IssueFilterOptions
 import com.github.vhrabar.issuehub.model.IssueLabel
 import com.github.vhrabar.issuehub.model.IssueMilestone
@@ -10,6 +11,8 @@ import com.github.vhrabar.issuehub.provider.IssueProvider
 import com.github.vhrabar.issuehub.settings.IssueHubSecrets
 import com.intellij.openapi.project.Project
 import kotlin.collections.map
+
+private fun GitHubUserDto.toActor(): IssueActor = IssueActor(login, avatarUrl)
 
 private fun GitHubIssueDto.toIssue(): Issue =
     Issue(
@@ -24,11 +27,9 @@ private fun GitHubIssueDto.toIssue(): Issue =
             },
         body = body,
         labels = labels.map { IssueLabel(it.name, it.color) },
-        assignee = assignee?.login,
-        assigneeAvatarUrl = assignee?.avatarUrl,
+        assignee = assignee?.toActor(),
         milestone = milestone?.let { IssueMilestone(it.number, it.title) },
-        author = user?.login,
-        authorAvatarUrl = user?.avatarUrl,
+        author = user?.toActor(),
         commentCount = comments,
         url = htmlUrl,
         createdAt = createdAt,

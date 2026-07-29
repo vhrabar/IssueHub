@@ -170,17 +170,12 @@ internal class IssueCellRenderer(
         stateText.clear()
         stateText.append(stateLabel(value.state), grayed)
 
-        // Prefer the assignee; fall back to the author, keeping login and avatar url in step.
-        val (account, avatarUrl) =
-            if (value.assignee != null) {
-                value.assignee to value.assigneeAvatarUrl
-            } else {
-                value.author to value.authorAvatarUrl
-            }
-        avatar.icon = account?.let { avatarLoader.avatar(avatarUrl, IssueAvatarIcon(it)) }
+        // Prefer the assignee; fall back to the author.
+        val account = value.assignee ?: value.author
+        avatar.icon = account?.let { avatarLoader.avatar(it.avatarUrl, IssueAvatarIcon(it.login)) }
         avatar.toolTipText = value.assignee
-            ?.let { IssueHubBundle["issue.assignedTo", it] }
-            ?: value.author?.let { IssueHubBundle["issue.openedBy", it] }
+            ?.let { IssueHubBundle["issue.assignedTo", it.login] }
+            ?: value.author?.let { IssueHubBundle["issue.openedBy", it.login] }
 
         comments.clear()
         if (value.commentCount > 0) {
@@ -194,11 +189,12 @@ internal class IssueCellRenderer(
 
     private fun metaText(value: Issue): String {
         val created = formatDate(value.createdAt)
+        val author = value.author?.login
         return when {
-            value.author != null && created != null ->
-                IssueHubBundle["issue.meta.createdBy", value.displayNumber, created, value.author]
+            author != null && created != null ->
+                IssueHubBundle["issue.meta.createdBy", value.displayNumber, created, author]
             created != null -> IssueHubBundle["issue.meta.created", value.displayNumber, created]
-            value.author != null -> IssueHubBundle["issue.meta.by", value.displayNumber, value.author]
+            author != null -> IssueHubBundle["issue.meta.by", value.displayNumber, author]
             else -> value.displayNumber
         }
     }
