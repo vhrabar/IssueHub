@@ -44,3 +44,14 @@ data class Issue(
     val createdAt: String,
     val updatedAt: String,
 )
+
+/**
+ * All Issue comps
+ *
+ * [bodyHtml] is the description already rendered to HTML by the provider
+ * It is null when the provider only hands back source text
+ */
+data class IssueDetail(
+    val issue: Issue,
+    val bodyHtml: String? = null,
+)

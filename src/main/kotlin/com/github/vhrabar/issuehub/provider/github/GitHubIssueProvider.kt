@@ -2,6 +2,7 @@ package com.github.vhrabar.issuehub.provider.github
 
 import com.github.vhrabar.issuehub.model.Issue
 import com.github.vhrabar.issuehub.model.IssueActor
+import com.github.vhrabar.issuehub.model.IssueDetail
 import com.github.vhrabar.issuehub.model.IssueFilterOptions
 import com.github.vhrabar.issuehub.model.IssueLabel
 import com.github.vhrabar.issuehub.model.IssueMilestone
@@ -53,6 +54,19 @@ class GitHubIssueProvider : IssueProvider {
         val repo = RepoDetector.detect(project) ?: return emptyList()
         val token = IssueHubSecrets.getToken(identifier)
         return client.fetchIssues(repo, token, query).map { it.toIssue() }
+    }
+
+    /**
+     * Re-reads the issue rather than trusting the list row
+     */
+    override suspend fun fetchIssueDetail(
+        project: Project,
+        issue: Issue,
+    ): IssueDetail? {
+        val repo = RepoDetector.detect(project) ?: return null
+        val token = IssueHubSecrets.getToken(identifier)
+        val dto = client.fetchIssue(repo, token, issue.id)
+        return IssueDetail(issue = dto.toIssue(), bodyHtml = dto.bodyHtml)
     }
 
     /**

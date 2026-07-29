@@ -1,6 +1,7 @@
 package com.github.vhrabar.issuehub.provider
 
 import com.github.vhrabar.issuehub.model.Issue
+import com.github.vhrabar.issuehub.model.IssueDetail
 import com.github.vhrabar.issuehub.model.IssueFilterOptions
 import com.github.vhrabar.issuehub.model.IssueQuery
 import com.intellij.openapi.extensions.ExtensionPointName
@@ -24,6 +25,17 @@ interface IssueProvider {
 
     /** values the filter UI can offer; empty when the provider can't enumerate them */
     suspend fun fetchFilterOptions(project: Project): IssueFilterOptions = IssueFilterOptions()
+
+    /**
+     * The full issue behind a list row, for the detail view.
+     *
+     * Null when the provider can't serve one, so the caller falls back to the row it already
+     * has instead of failing.
+     */
+    suspend fun fetchIssueDetail(
+        project: Project,
+        issue: Issue,
+    ): IssueDetail? = null
 
     companion object {
         val EP_NAME: ExtensionPointName<IssueProvider> =

@@ -58,6 +58,23 @@ internal class GitHubClient(
         return issues.filterNot { it.isPullRequest }
     }
 
+    /**
+     * A single issue, asked for with the `full` media type so the response carries `body_html`
+     * next to the Markdown source. The list endpoints deliberately stay on the default type:
+     * rows only ever show the title, and rendered bodies would bloat every page.
+     */
+    suspend fun fetchIssue(
+        repo: RepoCoordinates,
+        token: String?,
+        number: Int,
+    ): GitHubIssueDto = get(issueUri(repo, number), token, ACCEPT_FULL) { json.decodeFromString<GitHubIssueDto>(it) }
+
+    @VisibleForTesting
+    fun issueUri(
+        repo: RepoCoordinates,
+        number: Int,
+    ): URI = URI.create("$baseUrl/repos/${repo.owner}/${repo.name}/issues/$number")
+
     suspend fun fetchLabels(
         repo: RepoCoordinates,
         token: String?,
@@ -146,6 +163,7 @@ internal class GitHubClient(
     private suspend fun <T> get(
         uri: URI,
         token: String?,
+        accept: String = ACCEPT_JSON,
         decode: (String) -> T,
     ): T =
         withContext(Dispatchers.IO) {
@@ -153,7 +171,7 @@ internal class GitHubClient(
                 HttpRequest
                     .newBuilder(uri)
                     .timeout(Duration.ofSeconds(30))
-                    .header("Accept", "application/vnd.github+json")
+                    .header("Accept", accept)
                     .header("X-GitHub-Api-Version", "2026-03-10")
                     .GET()
             if (!token.isNullOrBlank()) {
@@ -179,6 +197,11 @@ internal class GitHubClient(
         }
 
     private companion object {
+        const val ACCEPT_JSON = "application/vnd.github+json"
+
+        /** Adds `body_html` (and `body_text`) alongside the Markdown source. */
+        const val ACCEPT_FULL = "application/vnd.github.full+json"
+
         /** Filter dropdowns list every value at once; GitHub caps a page at 100. */
         const val OPTIONS_PER_PAGE = 100
 
