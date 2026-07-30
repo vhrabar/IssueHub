@@ -20,7 +20,11 @@ repository from a dedicated tool window, without leaving your editor.
 
 - Lists issues for the GitHub repository detected from your project's Git remote
 - Shows issue number, title, labels, and assignee
-- Opens any issue in the browser with a double-click
+- Search issue titles and bodies, and filter by state, author, assignee, labels or milestone
+- Sort by creation date, last update or comment count
+- Opens an issue as an editor tab, full width and splittable next to your code, with the description
+  rendered in the IDE's own styling
+- Jumps to the issue on GitHub whenever you need the browser
 - Stores your GitHub token in the IDE's secure credential store
 
 <!-- Plugin description end -->
@@ -32,7 +36,15 @@ repository from a dedicated tool window, without leaving your editor.
 2. Open the **IssueHub** tool window.
 3. Click **Add Token…** and paste a GitHub personal access token (stored in the IDE's secure
    credential store, never in plain text).
-4. Click **Refresh** to load issues. Double-click an issue to open it in your browser.
+4. Click **Refresh** to load issues. Double-click an issue to open it as an editor tab, titled with
+   the issue number; **Open on GitHub** there opens the same issue in your browser.
+5. Use the search field and the **State / Author / Assignee / Label / Milestone / Sort** dropdowns to
+   narrow the list; **Reset** clears everything back to open issues, newest first.
+
+Filtering and sorting run on GitHub's side, so the results are the whole repository's issues, not
+just the ones already on screen. Typing in the search field uses GitHub's search endpoint, which is
+rate limited more tightly than the plain issue list, an authenticated token raises that limit
+considerably.
 
 ### Required token scope
 

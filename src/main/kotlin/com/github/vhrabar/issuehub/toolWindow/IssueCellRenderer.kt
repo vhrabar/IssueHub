@@ -6,7 +6,6 @@ import com.github.vhrabar.issuehub.model.IssueLabel
 import com.github.vhrabar.issuehub.model.IssueState
 import com.intellij.icons.AllIcons
 import com.intellij.ui.ColorUtil
-import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBLabel
@@ -154,15 +153,6 @@ internal class IssueCellRenderer(
         swatchImageUrl(color)?.let { """<img src="$it">""" }
             ?: """<span style="color:#${ColorUtil.toHex(color)};">&#9632;</span>"""
 
-    /** GitHub picks label colors against a white page, so lift them when the surface is dark. */
-    private fun labelTint(
-        label: IssueLabel,
-        background: Color,
-    ): Color {
-        val base = label.color?.let { ColorUtil.fromHex(it, null) } ?: NEUTRAL_LABEL
-        return if (ColorUtil.isDark(background)) ColorUtil.brighter(base, 1) else base
-    }
-
     private fun renderTrailing(
         value: Issue,
         grayed: SimpleTextAttributes,
@@ -300,9 +290,6 @@ internal class IssueCellRenderer(
     }
 
     private companion object {
-        /** Fallback for labels the API returned without a color. */
-        val NEUTRAL_LABEL = JBColor(Color(0x9AA7B0), Color(0x6C707E))
-
         fun borderless() =
             SimpleColoredComponent().apply {
                 isOpaque = false

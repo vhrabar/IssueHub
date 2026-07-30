@@ -22,6 +22,10 @@
             anchor="left"
             icon="/icons/issueHub.svg"
             factoryClass="com.github.vhrabar.issuehub.toolWindow.IssueHubToolWindowFactory"/>
+
+        <!-- Issues open in the editor area, not as tool window tabs. -->
+        <fileEditorProvider implementation="com.github.vhrabar.issuehub.editor.IssueFileEditorProvider"/>
+        <fileIconProvider implementation="com.github.vhrabar.issuehub.editor.IssueFileIconProvider"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.github.vhrabar.issuehub">

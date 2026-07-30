@@ -1,5 +1,6 @@
 package com.github.vhrabar.issuehub.toolWindow
 
+import com.github.vhrabar.issuehub.model.IssueLabel
 import com.github.vhrabar.issuehub.model.IssueState
 import com.intellij.ui.ColorUtil
 import com.intellij.ui.JBColor
@@ -28,13 +29,30 @@ internal val IssueState.dotColor: Color
             IssueState.OTHER -> OTHER_COLOR
         }
 
-/** A filled circle marking issue state, sized to sit on the title baseline. */
+/** Fallback for labels the API returned without a color. */
+private val NEUTRAL_LABEL = JBColor(Color(0x9AA7B0), Color(0x6C707E))
+
+/** GitHub picks label colors against a white page, so lift them when the surface is dark. */
+internal fun labelTint(
+    label: IssueLabel,
+    background: Color,
+): Color {
+    val base = label.color?.let { ColorUtil.fromHex(it, null) } ?: NEUTRAL_LABEL
+    return if (ColorUtil.isDark(background)) ColorUtil.brighter(base, 1) else base
+}
+
+/**
+ * A filled circle marking issue state, sized to sit on the title baseline.
+ *
+ * [size] is the box the dot is centred in: the default suits label text, 16 matches an editor tab.
+ */
 internal class IssueStateIcon(
     private val state: IssueState,
+    private val size: Int = SIZE,
 ) : Icon {
-    override fun getIconWidth(): Int = JBUI.scale(SIZE)
+    override fun getIconWidth(): Int = JBUI.scale(size)
 
-    override fun getIconHeight(): Int = JBUI.scale(SIZE)
+    override fun getIconHeight(): Int = JBUI.scale(size)
 
     override fun paintIcon(
         c: Component?,
@@ -45,8 +63,8 @@ internal class IssueStateIcon(
         val g2 = g.create() as Graphics2D
         try {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-            val d = JBUI.scale(DOT).toDouble()
-            val offset = (JBUI.scale(SIZE) - d) / 2
+            val d = JBUI.scale(size) * DOT_RATIO
+            val offset = (JBUI.scale(size) - d) / 2
             g2.color = state.dotColor
             g2.fill(Ellipse2D.Double(x + offset, y + offset, d, d))
         } finally {
@@ -56,7 +74,7 @@ internal class IssueStateIcon(
 
     private companion object {
         const val SIZE = 12
-        const val DOT = 8
+        const val DOT_RATIO = 2.0 / 3.0
     }
 }
 

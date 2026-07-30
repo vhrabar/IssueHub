@@ -1,6 +1,7 @@
 package com.github.vhrabar.issuehub.toolWindow
 
 import com.github.vhrabar.issuehub.IssueHubBundle
+import com.github.vhrabar.issuehub.editor.IssueVirtualFile
 import com.github.vhrabar.issuehub.model.Issue
 import com.github.vhrabar.issuehub.model.IssueFilterOptions
 import com.github.vhrabar.issuehub.model.IssueQuery
@@ -8,7 +9,6 @@ import com.github.vhrabar.issuehub.model.optionsFrom
 import com.github.vhrabar.issuehub.provider.IssueProvider
 import com.github.vhrabar.issuehub.provider.github.GitHubIssueProvider
 import com.github.vhrabar.issuehub.settings.IssueHubSecrets
-import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
@@ -133,7 +133,7 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                 object : MouseAdapter() {
                     override fun mouseClicked(e: MouseEvent) {
                         if (e.clickCount == 2) {
-                            issueList.selectedValue?.url?.let { BrowserUtil.browse(it) }
+                            issueList.selectedValue?.let(::openDetail)
                         }
                     }
                 },
@@ -143,6 +143,12 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         }
 
         override fun dispose() = Unit
+
+        /**
+         * Opens [issue] in the editor area rather than inside this tool window, so the description gets
+         * the full window width and can be split alongside code.
+         */
+        private fun openDetail(issue: Issue) = IssueVirtualFile.open(project, issue)
 
         private fun buildActions(): JBPanel<*> {
             val actions = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.RIGHT, JBUI.scale(4), 0))
