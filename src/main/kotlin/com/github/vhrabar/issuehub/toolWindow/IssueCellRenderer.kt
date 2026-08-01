@@ -127,7 +127,7 @@ internal class IssueCellRenderer(
             labelIcon.toolTipText = null
             return
         }
-        labelIcon.icon = IssueLabelIcon(labelTint(first, UIUtil.getListBackground(selected, hasFocus)))
+        labelIcon.icon = IssueLabelIcon(labelTint(first.color, UIUtil.getListBackground(selected, hasFocus)))
         labelIcon.toolTipText = labelsTooltip(value.labels)
     }
 
@@ -141,7 +141,7 @@ internal class IssueCellRenderer(
         // A borderless table keeps the swatch and name vertically centered against each row's height.
         val rows =
             labels.joinToString("") { label ->
-                "<tr><td valign='middle'>${labelSwatch(labelTint(label, background))}</td>" +
+                "<tr><td valign='middle'>${labelSwatch(labelTint(label.color, background))}</td>" +
                     "<td valign='middle'>&nbsp;${escapeHtml(label.name)}</td></tr>"
             }
         return "<html><b>${escapeHtml(IssueHubBundle["issue.labels.title"])}</b>" +
