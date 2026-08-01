@@ -11,12 +11,18 @@ data class IssueLabel(
 /**
  * A milestone an issue can belong to.
  *
- * [number] is the provider's own identifier
+ * [number] is the provider's own identifier, or [NUMBER_UNKNOWN] when the milestone was named
+ * by a source that doesn't publish one (history entries typically only carry the title).
  */
 data class IssueMilestone(
     val number: Int,
     val title: String,
-)
+) {
+    companion object {
+        /** Providers number milestones from 1, so zero can't collide with a real one. */
+        const val NUMBER_UNKNOWN = 0
+    }
+}
 
 /**
  * Generalized issue actor,  author, an assignee, or the actor behind a
@@ -50,10 +56,14 @@ data class Issue(
  *
  * [bodyHtml] is the description already rendered to HTML by the provider
  * It is null when the provider only hands back source text
+ *
+ * [timeline] is everything that happened after the description, oldest first. Empty when the
+ * provider can't serve a history, which is not the same as an issue nobody ever touched.
  */
 data class IssueDetail(
     val issue: Issue,
     val bodyHtml: String? = null,
+    val timeline: List<IssueTimelineItem> = emptyList(),
 )
 
 /**

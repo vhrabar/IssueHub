@@ -8,6 +8,7 @@ import com.github.vhrabar.issuehub.model.IssueLabel
 import com.github.vhrabar.issuehub.model.IssueMilestone
 import com.github.vhrabar.issuehub.model.IssueQuery
 import com.github.vhrabar.issuehub.model.IssueState
+import com.github.vhrabar.issuehub.model.IssueTimelineItem
 import com.github.vhrabar.issuehub.provider.IssueProvider
 import com.github.vhrabar.issuehub.settings.IssueHubSecrets
 import com.intellij.openapi.project.Project
@@ -37,6 +38,84 @@ private fun GitHubIssueDto.toIssue(): Issue =
         updatedAt = updatedAt,
     )
 
+private val IGNORED_TIMELINE_EVENTS = setOf("subscribed", "unsubscribed", "mentioned")
+
+internal fun GitHubTimelineEventDto.toTimelineItem(): IssueTimelineItem? {
+    val at = createdAt ?: return null
+    val who = (actor ?: user)?.toActor()
+    return when (event) {
+        "commented" ->
+            IssueTimelineItem.Comment(
+                actor = who,
+                at = at,
+                body = body,
+                bodyHtml = bodyHtml,
+                url = htmlUrl,
+                edited = updatedAt != null && updatedAt != createdAt,
+            )
+
+        "closed" -> IssueTimelineItem.StateChange(who, at, IssueState.CLOSED, stateReason)
+        "reopened" -> IssueTimelineItem.StateChange(who, at, IssueState.OPEN)
+
+        "labeled", "unlabeled" ->
+            label?.let { IssueTimelineItem.LabelChange(who, at, IssueLabel(it.name, it.color), added = event == "labeled") }
+
+        "assigned", "unassigned" ->
+            assignee?.let { IssueTimelineItem.AssigneeChange(who, at, it.toActor(), added = event == "assigned") }
+
+        "milestoned", "demilestoned" ->
+            milestone?.let {
+                IssueTimelineItem.MilestoneChange(
+                    actor = who,
+                    at = at,
+                    milestone = IssueMilestone(IssueMilestone.NUMBER_UNKNOWN, it.title),
+                    added = event == "milestoned",
+                )
+            }
+
+        "renamed" -> rename?.let { IssueTimelineItem.Renamed(who, at, it.from, it.to) }
+
+        "cross-referenced" ->
+            source?.issue?.let {
+                IssueTimelineItem.CrossReferenced(
+                    actor = who,
+                    at = at,
+                    displayNumber = "#${it.number}",
+                    title = it.title,
+                    url = it.htmlUrl,
+                    isPullRequest = it.isPullRequest,
+                )
+            }
+
+        "referenced" -> commitId?.let { IssueTimelineItem.Referenced(who, at, it, commitUrl?.let(::commitWebUrl)) }
+
+        null -> null
+        else -> IssueTimelineItem.Unknown(who, at, event)
+    }
+}
+
+/**
+ * Turns the API address of a commit into the page a browser can actually show:
+ * `api.github.com/repos/OWNER/NAME/commits/SHA` is served as JSON, the commit people mean lives at
+ * `github.com/OWNER/NAME/commit/SHA`.
+ *
+ * The owner and name come from the URL itself rather than the repo we're looking at, because a
+ * commit that references an issue may well live in a fork. Enterprise installs put the API under
+ * `HOST/api/v3` instead of an `api.` host, so both spellings are undone. Null when the address
+ * isn't one we recognise, which leaves the entry showing a plain sha instead of a dead link.
+ */
+internal fun commitWebUrl(apiUrl: String): String? {
+    val base = apiUrl.substringBefore(API_REPOS_PATH, missingDelimiterValue = "").ifEmpty { return null }
+    val path = apiUrl.substringAfter(API_REPOS_PATH)
+    if (API_COMMITS_PATH !in path) return null
+    val host = base.removeSuffix("/api/v3").replace("://api.", "://")
+    return "$host/${path.replaceFirst(API_COMMITS_PATH, WEB_COMMIT_PATH)}"
+}
+
+private const val API_REPOS_PATH = "/repos/"
+private const val API_COMMITS_PATH = "/commits/"
+private const val WEB_COMMIT_PATH = "/commit/"
+
 class GitHubIssueProvider : IssueProvider {
     private var client = GitHubClient()
 
@@ -57,7 +136,10 @@ class GitHubIssueProvider : IssueProvider {
     }
 
     /**
-     * Re-reads the issue rather than trusting the list row
+     * Re-reads the issue rather than trusting the list row, then the history behind it.
+     *
+     * The history is a second request and is allowed to fail on its own: a rate-limited or
+     * forbidden timeline shouldn't cost the user the description as well.
      */
     override suspend fun fetchIssueDetail(
         project: Project,
@@ -66,7 +148,12 @@ class GitHubIssueProvider : IssueProvider {
         val repo = RepoDetector.detect(project) ?: return null
         val token = IssueHubSecrets.getToken(identifier)
         val dto = client.fetchIssue(repo, token, issue.id)
-        return IssueDetail(issue = dto.toIssue(), bodyHtml = dto.bodyHtml)
+        val timeline =
+            runCatching { client.fetchTimeline(repo, token, issue.id) }
+                .getOrDefault(emptyList())
+                .filterNot { it.event in IGNORED_TIMELINE_EVENTS }
+                .mapNotNull { it.toTimelineItem() }
+        return IssueDetail(issue = dto.toIssue(), bodyHtml = dto.bodyHtml, timeline = timeline)
     }
 
     /**

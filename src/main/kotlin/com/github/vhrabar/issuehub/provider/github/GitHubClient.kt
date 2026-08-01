@@ -75,6 +75,41 @@ internal class GitHubClient(
         number: Int,
     ): URI = URI.create("$baseUrl/repos/${repo.owner}/${repo.name}/issues/$number")
 
+    /**
+     * Everything that happened to an issue after it was filed: comments, state changes, label and
+     * assignee edits. One endpoint covers all of them, again on the `full` media type so comment
+     * bodies arrive rendered.
+     *
+     * Pages are followed until one comes back short, up to [MAX_TIMELINE_PAGES]; a thread longer
+     * than that is truncated rather than allowed to spend an unbounded number of requests.
+     */
+    suspend fun fetchTimeline(
+        repo: RepoCoordinates,
+        token: String?,
+        number: Int,
+    ): List<GitHubTimelineEventDto> =
+        buildList {
+            for (page in 1..MAX_TIMELINE_PAGES) {
+                val batch =
+                    get(timelineUri(repo, number, page), token, ACCEPT_FULL) {
+                        json.decodeFromString<List<GitHubTimelineEventDto>>(it)
+                    }
+                addAll(batch)
+                if (batch.size < TIMELINE_PER_PAGE) break
+            }
+        }
+
+    @VisibleForTesting
+    fun timelineUri(
+        repo: RepoCoordinates,
+        number: Int,
+        page: Int,
+    ): URI =
+        URI.create(
+            "$baseUrl/repos/${repo.owner}/${repo.name}/issues/$number/timeline" +
+                "?per_page=$TIMELINE_PER_PAGE&page=$page",
+        )
+
     suspend fun fetchLabels(
         repo: RepoCoordinates,
         token: String?,
@@ -204,6 +239,11 @@ internal class GitHubClient(
 
         /** Filter dropdowns list every value at once; GitHub caps a page at 100. */
         const val OPTIONS_PER_PAGE = 100
+
+        const val TIMELINE_PER_PAGE = 100
+
+        /** 500 entries is far past what anyone scrolls, and bounds the requests one issue can cost. */
+        const val MAX_TIMELINE_PAGES = 5
 
         fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
 

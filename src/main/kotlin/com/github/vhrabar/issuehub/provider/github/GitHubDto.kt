@@ -52,3 +52,42 @@ internal data class GitHubIssueDto(
 ) {
     val isPullRequest: Boolean get() = pullRequest != null
 }
+
+@Serializable
+internal data class GitHubTimelineMilestoneDto(
+    val title: String,
+)
+
+@Serializable
+internal data class GitHubRenameDto(
+    val from: String,
+    val to: String,
+)
+
+@Serializable
+internal data class GitHubTimelineSourceDto(
+    val issue: GitHubIssueDto? = null,
+)
+
+/**
+ * One entry of `/issues/{n}/timeline`.
+ */
+@Serializable
+internal data class GitHubTimelineEventDto(
+    val event: String? = null,
+    val actor: GitHubUserDto? = null,
+    val user: GitHubUserDto? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    val body: String? = null,
+    @SerialName("body_html") val bodyHtml: String? = null,
+    @SerialName("html_url") val htmlUrl: String? = null,
+    val label: GitHubLabelDto? = null,
+    val assignee: GitHubUserDto? = null,
+    val milestone: GitHubTimelineMilestoneDto? = null,
+    val rename: GitHubRenameDto? = null,
+    val source: GitHubTimelineSourceDto? = null,
+    @SerialName("commit_id") val commitId: String? = null,
+    @SerialName("commit_url") val commitUrl: String? = null,
+    @SerialName("state_reason") val stateReason: String? = null,
+)
