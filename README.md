@@ -11,8 +11,9 @@
 
 
 
->  **Alpha.** Core flow works (detect repo > add token > list issues). Configuration is a
-> placeholder, GitHub is the only supported provider.
+>  **Alpha.** Core flow works (detect repo > add token > browse, filter and read issues).
+> Configuration is a placeholder, GitHub is the only supported provider, and IssueHub reads issues
+> only, it never writes.
 
 <!-- Plugin description -->
 **IssueHub** brings your GitHub issues into the IDE. Browse and open issues for the current
@@ -24,6 +25,8 @@ repository from a dedicated tool window, without leaving your editor.
 - Sort by creation date, last update or comment count
 - Opens an issue as an editor tab, full width and splittable next to your code, with the description
   rendered in the IDE's own styling
+- Reads the whole thread in that tab: comments alongside closes, reopens, label, assignee and
+  milestone changes, title edits, and references from other issues and commits
 - Jumps to the issue on GitHub whenever you need the browser
 - Stores your GitHub token in the IDE's secure credential store
 
@@ -38,7 +41,10 @@ repository from a dedicated tool window, without leaving your editor.
    credential store, never in plain text).
 4. Click **Refresh** to load issues. Double-click an issue to open it as an editor tab, titled with
    the issue number; **Open on GitHub** there opens the same issue in your browser.
-5. Use the search field and the **State / Author / Assignee / Label / Milestone / Sort** dropdowns to
+5. The issue tab shows the description and, below it, the issue's history as a thread of cards:
+   comments plus the closes, reopens, label, assignee and milestone changes and title edits around
+   them. **Refresh** in that tab re-reads the issue from GitHub.
+6. Use the search field and the **State / Author / Assignee / Label / Milestone / Sort** dropdowns to
    narrow the list; **Reset** clears everything back to open issues, newest first.
 
 Filtering and sorting run on GitHub's side, so the results are the whole repository's issues, not
