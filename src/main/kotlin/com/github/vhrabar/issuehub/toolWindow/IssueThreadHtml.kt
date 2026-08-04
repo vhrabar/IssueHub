@@ -28,9 +28,11 @@ private fun IssueTimelineItem.toHtml(
 ): String {
     val on = formatAt(at)
     return when (this) {
-        is IssueTimelineItem.Comment -> commentHtml(on, muted, opening)
+        is IssueTimelineItem.Comment -> {
+            commentHtml(on, muted, opening)
+        }
 
-        is IssueTimelineItem.StateChange ->
+        is IssueTimelineItem.StateChange -> {
             event(
                 if (state == IssueState.CLOSED) ThreadIcons.CLOSED else ThreadIcons.REOPENED,
                 when {
@@ -40,8 +42,9 @@ private fun IssueTimelineItem.toHtml(
                 },
                 muted,
             )
+        }
 
-        is IssueTimelineItem.LabelChange ->
+        is IssueTimelineItem.LabelChange -> {
             event(
                 ThreadIcons.label(label),
                 if (added) {
@@ -51,8 +54,9 @@ private fun IssueTimelineItem.toHtml(
                 },
                 muted,
             )
+        }
 
-        is IssueTimelineItem.AssigneeChange ->
+        is IssueTimelineItem.AssigneeChange -> {
             event(
                 ThreadIcons.ASSIGNEE,
                 if (added) {
@@ -62,8 +66,9 @@ private fun IssueTimelineItem.toHtml(
                 },
                 muted,
             )
+        }
 
-        is IssueTimelineItem.MilestoneChange ->
+        is IssueTimelineItem.MilestoneChange -> {
             event(
                 ThreadIcons.MILESTONE,
                 if (added) {
@@ -73,15 +78,17 @@ private fun IssueTimelineItem.toHtml(
                 },
                 muted,
             )
+        }
 
-        is IssueTimelineItem.Renamed ->
+        is IssueTimelineItem.Renamed -> {
             event(
                 ThreadIcons.RENAME,
                 IssueHubBundle["detail.timeline.renamed", on, escapeHtml(from), escapeHtml(to)],
                 muted,
             )
+        }
 
-        is IssueTimelineItem.CrossReferenced ->
+        is IssueTimelineItem.CrossReferenced -> {
             event(
                 ThreadIcons.REFERENCE,
                 IssueHubBundle[
@@ -91,8 +98,9 @@ private fun IssueTimelineItem.toHtml(
                 ],
                 muted,
             )
+        }
 
-        is IssueTimelineItem.Referenced ->
+        is IssueTimelineItem.Referenced -> {
             event(
                 ThreadIcons.COMMIT,
                 IssueHubBundle[
@@ -102,9 +110,11 @@ private fun IssueTimelineItem.toHtml(
                 ],
                 muted,
             )
+        }
 
-        is IssueTimelineItem.Unknown ->
+        is IssueTimelineItem.Unknown -> {
             event(ThreadIcons.OTHER, IssueHubBundle["detail.timeline.other", on, humanize(kind)], muted)
+        }
     }
 }
 

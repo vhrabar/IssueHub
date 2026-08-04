@@ -181,11 +181,21 @@ internal class IssueCellRenderer(
         val created = formatDate(value.createdAt)
         val author = value.author?.login
         return when {
-            author != null && created != null ->
+            author != null && created != null -> {
                 IssueHubBundle["issue.meta.createdBy", value.displayNumber, created, author]
-            created != null -> IssueHubBundle["issue.meta.created", value.displayNumber, created]
-            author != null -> IssueHubBundle["issue.meta.by", value.displayNumber, author]
-            else -> value.displayNumber
+            }
+
+            created != null -> {
+                IssueHubBundle["issue.meta.created", value.displayNumber, created]
+            }
+
+            author != null -> {
+                IssueHubBundle["issue.meta.by", value.displayNumber, author]
+            }
+
+            else -> {
+                value.displayNumber
+            }
         }
     }
 

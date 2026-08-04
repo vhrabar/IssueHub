@@ -71,19 +71,47 @@ internal object ThreadIcons {
     /** Null for a name we don't know, which the pane renders as nothing at all. */
     fun resolve(key: String): Icon? =
         when (key) {
-            COMMENT -> IssueEventIcon(IssueEventIcon.Kind.COMMENT)
-            OPENED, REOPENED -> IssueStateIcon(IssueState.OPEN)
-            CLOSED -> IssueStateIcon(IssueState.CLOSED)
-            ASSIGNEE -> IssueEventIcon(IssueEventIcon.Kind.ASSIGNEE)
-            MILESTONE -> IssueEventIcon(IssueEventIcon.Kind.MILESTONE)
-            RENAME -> IssueEventIcon(IssueEventIcon.Kind.RENAME)
-            REFERENCE -> IssueEventIcon(IssueEventIcon.Kind.REFERENCE)
-            COMMIT -> IssueEventIcon(IssueEventIcon.Kind.COMMIT)
-            OTHER -> IssueEventIcon(IssueEventIcon.Kind.OTHER)
-            else ->
+            COMMENT -> {
+                IssueEventIcon(IssueEventIcon.Kind.COMMENT)
+            }
+
+            OPENED, REOPENED -> {
+                IssueStateIcon(IssueState.OPEN)
+            }
+
+            CLOSED -> {
+                IssueStateIcon(IssueState.CLOSED)
+            }
+
+            ASSIGNEE -> {
+                IssueEventIcon(IssueEventIcon.Kind.ASSIGNEE)
+            }
+
+            MILESTONE -> {
+                IssueEventIcon(IssueEventIcon.Kind.MILESTONE)
+            }
+
+            RENAME -> {
+                IssueEventIcon(IssueEventIcon.Kind.RENAME)
+            }
+
+            REFERENCE -> {
+                IssueEventIcon(IssueEventIcon.Kind.REFERENCE)
+            }
+
+            COMMIT -> {
+                IssueEventIcon(IssueEventIcon.Kind.COMMIT)
+            }
+
+            OTHER -> {
+                IssueEventIcon(IssueEventIcon.Kind.OTHER)
+            }
+
+            else -> {
                 key
                     .takeIf { it.startsWith(LABEL_PREFIX) }
                     ?.let { IssueLabelIcon(labelTint(it.removePrefix(LABEL_PREFIX).ifEmpty { null }, UIUtil.getPanelBackground())) }
+            }
         }
 }
 

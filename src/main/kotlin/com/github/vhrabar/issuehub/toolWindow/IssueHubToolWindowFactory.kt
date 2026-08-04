@@ -39,7 +39,8 @@ import javax.swing.SwingUtilities
 import javax.swing.ToolTipManager
 
 class IssueHubToolWindowFactory : ToolWindowFactory {
-    @Suppress("UnstableApiUsage", "UsePropertyAccessSyntax") // setDisposer has no property form: getDisposer is nullable, setDisposer is not,
+    // setDisposer has no property form: getDisposer is nullable, setDisposer is not
+    @Suppress("UnstableApiUsage", "UsePropertyAccessSyntax")
     override fun createToolWindowContent(
         project: Project,
         toolWindow: ToolWindow,

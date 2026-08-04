@@ -44,7 +44,7 @@ internal fun GitHubTimelineEventDto.toTimelineItem(): IssueTimelineItem? {
     val at = createdAt ?: return null
     val who = (actor ?: user)?.toActor()
     return when (event) {
-        "commented" ->
+        "commented" -> {
             IssueTimelineItem.Comment(
                 actor = who,
                 at = at,
@@ -53,17 +53,25 @@ internal fun GitHubTimelineEventDto.toTimelineItem(): IssueTimelineItem? {
                 url = htmlUrl,
                 edited = updatedAt != null && updatedAt != createdAt,
             )
+        }
 
-        "closed" -> IssueTimelineItem.StateChange(who, at, IssueState.CLOSED, stateReason)
-        "reopened" -> IssueTimelineItem.StateChange(who, at, IssueState.OPEN)
+        "closed" -> {
+            IssueTimelineItem.StateChange(who, at, IssueState.CLOSED, stateReason)
+        }
 
-        "labeled", "unlabeled" ->
+        "reopened" -> {
+            IssueTimelineItem.StateChange(who, at, IssueState.OPEN)
+        }
+
+        "labeled", "unlabeled" -> {
             label?.let { IssueTimelineItem.LabelChange(who, at, IssueLabel(it.name, it.color), added = event == "labeled") }
+        }
 
-        "assigned", "unassigned" ->
+        "assigned", "unassigned" -> {
             assignee?.let { IssueTimelineItem.AssigneeChange(who, at, it.toActor(), added = event == "assigned") }
+        }
 
-        "milestoned", "demilestoned" ->
+        "milestoned", "demilestoned" -> {
             milestone?.let {
                 IssueTimelineItem.MilestoneChange(
                     actor = who,
@@ -72,10 +80,13 @@ internal fun GitHubTimelineEventDto.toTimelineItem(): IssueTimelineItem? {
                     added = event == "milestoned",
                 )
             }
+        }
 
-        "renamed" -> rename?.let { IssueTimelineItem.Renamed(who, at, it.from, it.to) }
+        "renamed" -> {
+            rename?.let { IssueTimelineItem.Renamed(who, at, it.from, it.to) }
+        }
 
-        "cross-referenced" ->
+        "cross-referenced" -> {
             source?.issue?.let {
                 IssueTimelineItem.CrossReferenced(
                     actor = who,
@@ -86,11 +97,19 @@ internal fun GitHubTimelineEventDto.toTimelineItem(): IssueTimelineItem? {
                     isPullRequest = it.isPullRequest,
                 )
             }
+        }
 
-        "referenced" -> commitId?.let { IssueTimelineItem.Referenced(who, at, it, commitUrl?.let(::commitWebUrl)) }
+        "referenced" -> {
+            commitId?.let { IssueTimelineItem.Referenced(who, at, it, commitUrl?.let(::commitWebUrl)) }
+        }
 
-        null -> null
-        else -> IssueTimelineItem.Unknown(who, at, event)
+        null -> {
+            null
+        }
+
+        else -> {
+            IssueTimelineItem.Unknown(who, at, event)
+        }
     }
 }
 
