@@ -35,7 +35,7 @@
 
 ### Compatibility
 
-- Verified against IntelliJ Platform 2025.2 through 2026.2
+- Verified against IntelliJ Platform 2025.3 through 2026.3rc
 ## [0.0.2] - 2026-07-21
 
 ### Added
