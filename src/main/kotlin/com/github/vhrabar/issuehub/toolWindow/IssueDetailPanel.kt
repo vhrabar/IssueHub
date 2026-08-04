@@ -77,7 +77,7 @@ internal class IssueDetailPanel(
     private var requestId = 0
 
     /** The thread, so an editor host can hand it the focus and arrow keys scroll straight away. */
-    internal val preferredFocusComponent: JComponent get() = thread
+    internal fun preferredFocusComponent(): JComponent = thread
 
     init {
         add(header(), BorderLayout.NORTH)

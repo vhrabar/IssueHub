@@ -22,7 +22,7 @@ internal class IssueFileEditor(
 
     override fun getComponent(): JComponent = panel
 
-    override fun getPreferredFocusedComponent(): JComponent = panel.preferredFocusComponent
+    override fun getPreferredFocusedComponent(): JComponent = panel.preferredFocusComponent()
 
     override fun getName(): String = file.issue.displayNumber
 
