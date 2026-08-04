@@ -34,6 +34,7 @@ import javax.swing.event.HyperlinkEvent
  * icons, not images an HTML pane could fetch; each card still renders its own text through the
  * platform's HTML pane, which themes GitHub's markup to match the IDE.
  */
+@Suppress("UnstableApiUsage")
 internal class IssueThreadPanel :
     JBPanel<IssueThreadPanel>(VerticalLayout(JBUI.scale(CARD_GAP))),
     Scrollable,
@@ -198,7 +199,7 @@ internal class IssueThreadPanel :
         const val CARD_GAP = 8
         const val CARD_PADDING = 10
         const val CARD_ARC = 10
-        val AVATAR_SIZE = CircularAvatarIcon.MAX_SIZE
+        const val AVATAR_SIZE = CircularAvatarIcon.MAX_SIZE
         const val AUTHOR_WIDTH = 150
         const val SCROLL_UNIT = 16
     }

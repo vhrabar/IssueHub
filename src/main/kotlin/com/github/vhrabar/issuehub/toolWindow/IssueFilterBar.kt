@@ -40,6 +40,7 @@ import javax.swing.event.DocumentEvent
  * Owns the current [query] and reports every change through [onQueryChanged]; it never touches
  * the list itself.
  */
+@Suppress("UnstableApiUsage")
 internal class IssueFilterBar(
     parent: Disposable,
     trailing: JComponent,
