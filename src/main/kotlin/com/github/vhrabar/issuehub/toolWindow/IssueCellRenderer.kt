@@ -6,7 +6,6 @@ import com.github.vhrabar.issuehub.model.IssueLabel
 import com.github.vhrabar.issuehub.model.IssueState
 import com.intellij.icons.AllIcons
 import com.intellij.ui.ColorUtil
-import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBLabel
@@ -128,7 +127,7 @@ internal class IssueCellRenderer(
             labelIcon.toolTipText = null
             return
         }
-        labelIcon.icon = IssueLabelIcon(labelTint(first, UIUtil.getListBackground(selected, hasFocus)))
+        labelIcon.icon = IssueLabelIcon(labelTint(first.color, UIUtil.getListBackground(selected, hasFocus)))
         labelIcon.toolTipText = labelsTooltip(value.labels)
     }
 
@@ -142,7 +141,7 @@ internal class IssueCellRenderer(
         // A borderless table keeps the swatch and name vertically centered against each row's height.
         val rows =
             labels.joinToString("") { label ->
-                "<tr><td valign='middle'>${labelSwatch(labelTint(label, background))}</td>" +
+                "<tr><td valign='middle'>${labelSwatch(labelTint(label.color, background))}</td>" +
                     "<td valign='middle'>&nbsp;${escapeHtml(label.name)}</td></tr>"
             }
         return "<html><b>${escapeHtml(IssueHubBundle["issue.labels.title"])}</b>" +
@@ -154,15 +153,6 @@ internal class IssueCellRenderer(
         swatchImageUrl(color)?.let { """<img src="$it">""" }
             ?: """<span style="color:#${ColorUtil.toHex(color)};">&#9632;</span>"""
 
-    /** GitHub picks label colors against a white page, so lift them when the surface is dark. */
-    private fun labelTint(
-        label: IssueLabel,
-        background: Color,
-    ): Color {
-        val base = label.color?.let { ColorUtil.fromHex(it, null) } ?: NEUTRAL_LABEL
-        return if (ColorUtil.isDark(background)) ColorUtil.brighter(base, 1) else base
-    }
-
     private fun renderTrailing(
         value: Issue,
         grayed: SimpleTextAttributes,
@@ -170,17 +160,12 @@ internal class IssueCellRenderer(
         stateText.clear()
         stateText.append(stateLabel(value.state), grayed)
 
-        // Prefer the assignee; fall back to the author, keeping login and avatar url in step.
-        val (account, avatarUrl) =
-            if (value.assignee != null) {
-                value.assignee to value.assigneeAvatarUrl
-            } else {
-                value.author to value.authorAvatarUrl
-            }
-        avatar.icon = account?.let { avatarLoader.avatar(avatarUrl, IssueAvatarIcon(it)) }
+        // Prefer the assignee; fall back to the author.
+        val account = value.assignee ?: value.author
+        avatar.icon = account?.let { avatarLoader.avatar(it.avatarUrl, IssueAvatarIcon(it.login)) }
         avatar.toolTipText = value.assignee
-            ?.let { IssueHubBundle["issue.assignedTo", it] }
-            ?: value.author?.let { IssueHubBundle["issue.openedBy", it] }
+            ?.let { IssueHubBundle["issue.assignedTo", it.login] }
+            ?: value.author?.let { IssueHubBundle["issue.openedBy", it.login] }
 
         comments.clear()
         if (value.commentCount > 0) {
@@ -194,12 +179,23 @@ internal class IssueCellRenderer(
 
     private fun metaText(value: Issue): String {
         val created = formatDate(value.createdAt)
+        val author = value.author?.login
         return when {
-            value.author != null && created != null ->
-                IssueHubBundle["issue.meta.createdBy", value.displayNumber, created, value.author]
-            created != null -> IssueHubBundle["issue.meta.created", value.displayNumber, created]
-            value.author != null -> IssueHubBundle["issue.meta.by", value.displayNumber, value.author]
-            else -> value.displayNumber
+            author != null && created != null -> {
+                IssueHubBundle["issue.meta.createdBy", value.displayNumber, created, author]
+            }
+
+            created != null -> {
+                IssueHubBundle["issue.meta.created", value.displayNumber, created]
+            }
+
+            author != null -> {
+                IssueHubBundle["issue.meta.by", value.displayNumber, author]
+            }
+
+            else -> {
+                value.displayNumber
+            }
         }
     }
 
@@ -304,9 +300,6 @@ internal class IssueCellRenderer(
     }
 
     private companion object {
-        /** Fallback for labels the API returned without a color. */
-        val NEUTRAL_LABEL = JBColor(Color(0x9AA7B0), Color(0x6C707E))
-
         fun borderless() =
             SimpleColoredComponent().apply {
                 isOpaque = false

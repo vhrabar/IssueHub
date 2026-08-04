@@ -1,12 +1,15 @@
 package com.github.vhrabar.issuehub.toolWindow
 
 import com.github.vhrabar.issuehub.IssueHubBundle
+import com.github.vhrabar.issuehub.editor.IssueVirtualFile
 import com.github.vhrabar.issuehub.model.Issue
+import com.github.vhrabar.issuehub.model.IssueFilterOptions
 import com.github.vhrabar.issuehub.model.IssueQuery
+import com.github.vhrabar.issuehub.model.optionsFrom
 import com.github.vhrabar.issuehub.provider.IssueProvider
 import com.github.vhrabar.issuehub.provider.github.GitHubIssueProvider
 import com.github.vhrabar.issuehub.settings.IssueHubSecrets
-import com.intellij.ide.BrowserUtil
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
@@ -36,13 +39,24 @@ import javax.swing.SwingUtilities
 import javax.swing.ToolTipManager
 
 class IssueHubToolWindowFactory : ToolWindowFactory {
+    // setDisposer has no property form: getDisposer is nullable, setDisposer is not
+    @Suppress("UnstableApiUsage", "UsePropertyAccessSyntax")
     override fun createToolWindowContent(
         project: Project,
         toolWindow: ToolWindow,
     ) {
         val panel = IssueHubToolWindowPanel(project)
         toolWindow.component.putClientProperty(ToolWindowContentUi.HIDE_ID_LABEL, "true")
-        val content = ContentFactory.getInstance().createContent(panel, IssueHubBundle["toolWindow.title"], false)
+
+        val source = IssueProvider.firstApplicable(project)?.sourceLabel(project)
+        val content =
+            ContentFactory.getInstance().createContent(
+                panel,
+                source?.substringAfterLast('/') ?: IssueHubBundle["toolWindow.title"],
+                false,
+            )
+        content.description = source
+        content.setDisposer(panel)
         toolWindow.contentManager.addContent(content)
     }
 
@@ -50,7 +64,8 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
 
     private class IssueHubToolWindowPanel(
         private val project: Project,
-    ) : JBPanel<IssueHubToolWindowPanel>(BorderLayout()) {
+    ) : JBPanel<IssueHubToolWindowPanel>(BorderLayout()),
+        Disposable {
         private val listModel = DefaultListModel<Issue>()
         private val issueList =
             object : JBList<Issue>(listModel) {
@@ -101,39 +116,56 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                 )
             }
 
+        /** Values the provider enumerated, and values merely seen on issues we've already loaded. */
+        private var providerOptions = IssueFilterOptions()
+        private var discoveredOptions = IssueFilterOptions()
+
+        /** Guards against a slow response for an abandoned query overwriting a newer one. */
+        private var requestId = 0
+
+        private val filterBar =
+            IssueFilterBar(this, buildActions()) { refresh(reloadOptions = false) }
+
         init {
             issueList.cellRenderer = IssueCellRenderer(avatarLoader)
-            add(buildToolbar(), BorderLayout.NORTH)
+            add(filterBar, BorderLayout.NORTH)
             add(center, BorderLayout.CENTER)
 
             issueList.addMouseListener(
                 object : MouseAdapter() {
                     override fun mouseClicked(e: MouseEvent) {
                         if (e.clickCount == 2) {
-                            issueList.selectedValue?.url?.let { BrowserUtil.browse(it) }
+                            issueList.selectedValue?.let(::openDetail)
                         }
                     }
                 },
             )
 
-            refresh()
+            refresh(reloadOptions = true)
         }
 
-        private fun buildToolbar(): JBPanel<*> {
-            val toolbar = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(4)))
-            toolbar.border = JBUI.Borders.empty(4)
-            toolbar.add(
+        override fun dispose() = Unit
+
+        /**
+         * Opens [issue] in the editor area rather than inside this tool window, so the description gets
+         * the full window width and can be split alongside code.
+         */
+        private fun openDetail(issue: Issue) = IssueVirtualFile.open(project, issue)
+
+        private fun buildActions(): JBPanel<*> {
+            val actions = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.RIGHT, JBUI.scale(4), 0))
+            actions.add(
                 JButton(IssueHubBundle["toolWindow.refresh"]).apply {
-                    addActionListener { refresh() }
+                    addActionListener { refresh(reloadOptions = true) }
                 },
             )
             // TODO: temporary placeholder until a proper settings UI exists.
-            toolbar.add(
+            actions.add(
                 JButton(IssueHubBundle["toolWindow.addToken"]).apply {
                     addActionListener { promptForToken() }
                 },
             )
-            return toolbar
+            return actions
         }
 
         private fun showStatus(text: String) {
@@ -141,30 +173,50 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             cardLayout.show(center, STATUS_CARD)
         }
 
-        private fun showIssues(issues: List<Issue>) {
+        private fun showIssues(
+            issues: List<Issue>,
+            query: IssueQuery,
+        ) {
             listModel.clear()
             if (issues.isEmpty()) {
-                showStatus(IssueHubBundle["toolWindow.empty"])
+                showStatus(IssueHubBundle[if (query.isFiltered) "toolWindow.emptyFiltered" else "toolWindow.empty"])
                 return
             }
             issues.forEach(listModel::addElement)
             cardLayout.show(center, LIST_CARD)
         }
 
-        private fun refresh() {
+        /**
+         * [reloadOptions] re-reads the label/assignee/milestone lists too; they barely ever change,
+         * so filter and search changes skip that round trip and only re-run the query.
+         */
+        private fun refresh(reloadOptions: Boolean) {
             val provider = IssueProvider.firstApplicable(project)
             if (provider == null) {
                 showStatus(IssueHubBundle["toolWindow.noProvider"])
                 return
             }
+            val query = filterBar.query
+            val id = ++requestId
             showStatus(IssueHubBundle["toolWindow.loading"])
             // fetchIssues is a suspend fn doing network IO
             ApplicationManager.getApplication().executeOnPooledThread {
-                val result = runCatching { runBlocking { provider.fetchIssues(project, IssueQuery()) } }
+                val result = runCatching { runBlocking { provider.fetchIssues(project, query) } }
+                val options =
+                    if (reloadOptions) {
+                        runCatching { runBlocking { provider.fetchFilterOptions(project) } }.getOrNull()
+                    } else {
+                        null
+                    }
                 ApplicationManager.getApplication().invokeLater {
+                    if (id != requestId) return@invokeLater
+                    options?.let { providerOptions = it }
                     result
-                        .onSuccess { showIssues(it) }
-                        .onFailure { showStatus(IssueHubBundle["toolWindow.error", it.message ?: it.toString()]) }
+                        .onSuccess { issues ->
+                            discoveredOptions = discoveredOptions.mergedWith(optionsFrom(issues))
+                            filterBar.setOptions(providerOptions.mergedWith(discoveredOptions))
+                            showIssues(issues, query)
+                        }.onFailure { showStatus(IssueHubBundle["toolWindow.error", it.message ?: it.toString()]) }
                 }
             }
         }
@@ -184,7 +236,7 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                         IssueHubBundle["toolWindow.addToken.saved"],
                         IssueHubBundle["toolWindow.addToken.title"],
                     )
-                    refresh()
+                    refresh(reloadOptions = true)
                 }
             }
         }
