@@ -10,6 +10,10 @@ import com.intellij.openapi.diagnostic.thisLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import org.jetbrains.annotations.VisibleForTesting
 import java.net.URI
 import java.net.URLEncoder
@@ -109,6 +113,69 @@ internal class GitHubClient(
             "$baseUrl/repos/${repo.owner}/${repo.name}/issues/$number/timeline" +
                 "?per_page=$TIMELINE_PER_PAGE&page=$page",
         )
+
+    /**
+     * The pull requests and branches opened for an issue, GitHub's "Development" section.
+     */
+    suspend fun fetchDevelopment(
+        repo: RepoCoordinates,
+        token: String?,
+        number: Int,
+    ): GitHubDevelopmentDto =
+        graphQl(repo, token, number, DEVELOPMENT_QUERY) {
+            json.decodeFromString<GitHubGraphQlResponse<GitHubRepositoryDataDto<GitHubDevelopmentDto>>>(it)
+        }
+
+    /**
+     * The project boards the issue sits on, with the fields each board keeps for it.
+     */
+    suspend fun fetchProjectItems(
+        repo: RepoCoordinates,
+        token: String?,
+        number: Int,
+    ): GitHubProjectItemsDto =
+        graphQl(repo, token, number, PROJECTS_QUERY) {
+            json.decodeFromString<GitHubGraphQlResponse<GitHubRepositoryDataDto<GitHubProjectItemsDto>>>(it)
+        }
+
+    /**
+     * The `/graphql` endpoint next to the REST base: `api.github.com/graphql` for github.com, and
+     * `HOST/api/graphql` for an Enterprise install, whose REST lives under `HOST/api/v3`.
+     */
+    @VisibleForTesting
+    fun graphQlUri(): URI =
+        URI.create(
+            if (baseUrl.endsWith(ENTERPRISE_REST_PATH)) {
+                baseUrl.removeSuffix(ENTERPRISE_REST_PATH) + "/api/graphql"
+            } else {
+                "$baseUrl/graphql"
+            },
+        )
+
+    /** Runs [query] for one issue and unwraps `data.repository.issue`, which is all any of them ask for. */
+    private suspend fun <T> graphQl(
+        repo: RepoCoordinates,
+        token: String?,
+        number: Int,
+        query: String,
+        decode: (String) -> GitHubGraphQlResponse<GitHubRepositoryDataDto<T>>,
+    ): T {
+        if (token.isNullOrBlank()) throw GitHubApiException("The GitHub GraphQL API needs a token.")
+        val payload =
+            buildJsonObject {
+                put("query", query)
+                putJsonObject("variables") {
+                    put("owner", repo.owner)
+                    put("name", repo.name)
+                    put("number", number)
+                }
+            }
+        val response = post(graphQlUri(), token, json.encodeToString(JsonObject.serializer(), payload), decode)
+        return response.data?.repository?.issue
+            ?: throw GitHubApiException(
+                response.errors.firstOrNull()?.message ?: "GitHub GraphQL returned no data for issue #$number.",
+            )
+    }
 
     suspend fun fetchLabels(
         repo: RepoCoordinates,
@@ -222,6 +289,34 @@ internal class GitHubClient(
             decode(response.body())
         }
 
+    /** GraphQL is one POST to one address; the query travels in the body rather than the path. */
+    private suspend fun <T> post(
+        uri: URI,
+        token: String?,
+        body: String,
+        decode: (String) -> T,
+    ): T =
+        withContext(Dispatchers.IO) {
+            val request =
+                HttpRequest
+                    .newBuilder(uri)
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Accept", ACCEPT_JSON)
+                    .header("Content-Type", "application/json")
+                    .header("X-GitHub-Api-Version", "2026-03-10")
+                    .apply { if (!token.isNullOrBlank()) header("Authorization", "Bearer $token") }
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .build()
+
+            val response = http.send(request, HttpResponse.BodyHandlers.ofString())
+            if (response.statusCode() !in 200..299) {
+                thisLogger().warn("GitHub API returned ${response.statusCode()} for ${uri.path}")
+                throw GitHubApiException(describeError(response.statusCode()))
+            }
+
+            decode(response.body())
+        }
+
     private fun describeError(status: Int): String =
         when (status) {
             401 -> "Authentication failed (401). Check your GitHub token."
@@ -244,6 +339,66 @@ internal class GitHubClient(
 
         /** 500 entries is far past what anyone scrolls, and bounds the requests one issue can cost. */
         const val MAX_TIMELINE_PAGES = 5
+
+        /** Enterprise serves REST under this suffix and GraphQL as a sibling of it. */
+        const val ENTERPRISE_REST_PATH = "/api/v3"
+
+        /** Sidebar sections list what they have; an issue with more linked than this is unusual. */
+        const val GRAPHQL_NODES = 20
+
+        /** A board can carry a good few columns, and we show whichever of them are filled in. */
+        const val PROJECT_FIELDS = 30
+
+        /**
+         * `$` is the sigil for a GraphQL variable, so every one of them has to survive Kotlin's own
+         * reading of the string.
+         */
+        const val DOLLAR = "$"
+
+        val DEVELOPMENT_QUERY =
+            """
+            query(${DOLLAR}owner: String!, ${DOLLAR}name: String!, ${DOLLAR}number: Int!) {
+              repository(owner: ${DOLLAR}owner, name: ${DOLLAR}name) {
+                issue(number: ${DOLLAR}number) {
+                  closedByPullRequestsReferences(first: $GRAPHQL_NODES, includeClosedPrs: true) {
+                    nodes { number title url state isDraft }
+                  }
+                  linkedBranches(first: $GRAPHQL_NODES) {
+                    nodes { ref { name repository { url } } }
+                  }
+                }
+              }
+            }
+            """.trimIndent()
+
+        /**
+         * Every field type worth showing is asked for in one selection set, so a board's own columns
+         * — status, size, estimate, start and target dates, iteration — come back whatever the user
+         * called them. Types we don't list arrive as empty objects and are dropped on the way in.
+         */
+        val PROJECTS_QUERY =
+            """
+            query(${DOLLAR}owner: String!, ${DOLLAR}name: String!, ${DOLLAR}number: Int!) {
+              repository(owner: ${DOLLAR}owner, name: ${DOLLAR}name) {
+                issue(number: ${DOLLAR}number) {
+                  projectItems(first: $GRAPHQL_NODES) {
+                    nodes {
+                      project { title url }
+                      fieldValues(first: $PROJECT_FIELDS) {
+                        nodes {
+                          ... on ProjectV2ItemFieldTextValue { text field { ... on ProjectV2FieldCommon { name } } }
+                          ... on ProjectV2ItemFieldNumberValue { number field { ... on ProjectV2FieldCommon { name } } }
+                          ... on ProjectV2ItemFieldDateValue { date field { ... on ProjectV2FieldCommon { name } } }
+                          ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { name } } }
+                          ... on ProjectV2ItemFieldIterationValue { title field { ... on ProjectV2FieldCommon { name } } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """.trimIndent()
 
         fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
 

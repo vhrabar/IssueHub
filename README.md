@@ -27,6 +27,9 @@ repository from a dedicated tool window, without leaving your editor.
   rendered in the IDE's own styling
 - Reads the whole thread in that tab: comments alongside closes, reopens, label, assignee and
   milestone changes, title edits, and references from other issues and commits
+- Keeps the issue's assignees, labels, projects (with the fields each board tracks, such as status,
+  size, estimate and dates), milestone, and the pull requests and branches opened for it in a
+  sidebar beside the thread, the way GitHub's own issue page does
 - Jumps to the issue on GitHub whenever you need the browser
 - Stores your GitHub token in the IDE's secure credential store
 

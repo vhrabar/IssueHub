@@ -42,13 +42,62 @@ data class Issue(
     val state: IssueState,
     val body: String? = null,
     val labels: List<IssueLabel> = emptyList(),
-    val assignee: IssueActor? = null,
+    val assignees: List<IssueActor> = emptyList(),
     val milestone: IssueMilestone? = null,
     val author: IssueActor? = null,
     val commentCount: Int = 0,
     val url: String,
     val createdAt: String,
     val updatedAt: String,
+) {
+    /** The one account a single-line view has room for; an issue can carry several. */
+    val assignee: IssueActor? get() = assignees.firstOrNull()
+}
+
+/** How far along a pull request linked to an issue is; merged is not just another closed. */
+enum class PullRequestState { OPEN, DRAFT, MERGED, CLOSED }
+
+/** A pull request that closes the issue, as listed under GitHub's "Development" heading. */
+data class IssueLinkedPullRequest(
+    val displayNumber: String,
+    val title: String,
+    val url: String,
+    val state: PullRequestState,
+)
+
+/** A branch opened for the issue, which usually precedes the pull request. */
+data class IssueLinkedBranch(
+    val name: String,
+    val url: String? = null,
+)
+
+/**
+ * What is linked to the issue for the work itself.
+ *
+ * Providers hand back null when they can't read it at all, which the view says out loud rather
+ * than passing off as an issue nobody has started.
+ */
+data class IssueDevelopment(
+    val pullRequests: List<IssueLinkedPullRequest> = emptyList(),
+    val branches: List<IssueLinkedBranch> = emptyList(),
+) {
+    val isEmpty: Boolean get() = pullRequests.isEmpty() && branches.isEmpty()
+}
+
+/** One of a project's own columns as it stands for this issue, e.g. `Size` / `Large`. */
+data class IssueProjectField(
+    val name: String,
+    val value: String,
+)
+
+/**
+ * The issue's place on one project board: the board itself plus whichever of its fields
+ * (status, size, estimate, dates, iteration…) have been filled in for this issue.
+ */
+data class IssueProjectItem(
+    val title: String,
+    val url: String? = null,
+    val fields: List<IssueProjectField> = emptyList(),
 )
 
 /**
@@ -59,11 +108,16 @@ data class Issue(
  *
  * [timeline] is everything that happened after the description, oldest first. Empty when the
  * provider can't serve a history, which is not the same as an issue nobody ever touched.
+ *
+ * [development] and [projects] are null, rather than empty, when the provider couldn't read them —
+ * a token without the scope they need, typically.
  */
 data class IssueDetail(
     val issue: Issue,
     val bodyHtml: String? = null,
     val timeline: List<IssueTimelineItem> = emptyList(),
+    val development: IssueDevelopment? = null,
+    val projects: List<IssueProjectItem>? = null,
 )
 
 /**

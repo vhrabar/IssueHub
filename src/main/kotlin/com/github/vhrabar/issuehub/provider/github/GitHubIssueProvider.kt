@@ -3,12 +3,18 @@ package com.github.vhrabar.issuehub.provider.github
 import com.github.vhrabar.issuehub.model.Issue
 import com.github.vhrabar.issuehub.model.IssueActor
 import com.github.vhrabar.issuehub.model.IssueDetail
+import com.github.vhrabar.issuehub.model.IssueDevelopment
 import com.github.vhrabar.issuehub.model.IssueFilterOptions
 import com.github.vhrabar.issuehub.model.IssueLabel
+import com.github.vhrabar.issuehub.model.IssueLinkedBranch
+import com.github.vhrabar.issuehub.model.IssueLinkedPullRequest
 import com.github.vhrabar.issuehub.model.IssueMilestone
+import com.github.vhrabar.issuehub.model.IssueProjectField
+import com.github.vhrabar.issuehub.model.IssueProjectItem
 import com.github.vhrabar.issuehub.model.IssueQuery
 import com.github.vhrabar.issuehub.model.IssueState
 import com.github.vhrabar.issuehub.model.IssueTimelineItem
+import com.github.vhrabar.issuehub.model.PullRequestState
 import com.github.vhrabar.issuehub.provider.IssueProvider
 import com.github.vhrabar.issuehub.settings.IssueHubSecrets
 import com.intellij.openapi.project.Project
@@ -16,7 +22,7 @@ import kotlin.collections.map
 
 private fun GitHubUserDto.toActor(): IssueActor = IssueActor(login, avatarUrl)
 
-private fun GitHubIssueDto.toIssue(): Issue =
+internal fun GitHubIssueDto.toIssue(): Issue =
     Issue(
         id = number,
         displayNumber = "#$number",
@@ -29,7 +35,8 @@ private fun GitHubIssueDto.toIssue(): Issue =
             },
         body = body,
         labels = labels.map { IssueLabel(it.name, it.color) },
-        assignee = assignee?.toActor(),
+        // `assignees` is the whole list and `assignee` the first of it; older payloads only carry the latter.
+        assignees = assignees.ifEmpty { listOfNotNull(assignee) }.map { it.toActor() },
         milestone = milestone?.let { IssueMilestone(it.number, it.title) },
         author = user?.toActor(),
         commentCount = comments,
@@ -37,6 +44,69 @@ private fun GitHubIssueDto.toIssue(): Issue =
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
+
+internal fun GitHubDevelopmentDto.toDevelopment(): IssueDevelopment =
+    IssueDevelopment(
+        pullRequests =
+            pullRequests?.nodes.orEmpty().filterNotNull().map { pr ->
+                IssueLinkedPullRequest(
+                    displayNumber = "#${pr.number}",
+                    title = pr.title,
+                    url = pr.url,
+                    state =
+                        when {
+                            pr.state.equals("MERGED", ignoreCase = true) -> PullRequestState.MERGED
+                            pr.state.equals("CLOSED", ignoreCase = true) -> PullRequestState.CLOSED
+                            pr.isDraft -> PullRequestState.DRAFT
+                            else -> PullRequestState.OPEN
+                        },
+                )
+            },
+        branches =
+            branches?.nodes.orEmpty().filterNotNull().mapNotNull { branch ->
+                val name = branch.ref?.name ?: return@mapNotNull null
+                // GraphQL gives the repository, not the branch page; the web address is derived from it.
+                val repositoryUrl = branch.ref.repository?.url
+                IssueLinkedBranch(name, repositoryUrl?.let { "$it/tree/$name" })
+            },
+    )
+
+internal fun GitHubProjectItemsDto.toProjectItems(): List<IssueProjectItem> =
+    projectItems?.nodes.orEmpty().filterNotNull().mapNotNull { item ->
+        val project = item.project ?: return@mapNotNull null
+        IssueProjectItem(
+            title = project.title?.takeIf { it.isNotBlank() } ?: return@mapNotNull null,
+            url = project.url,
+            fields =
+                item.fieldValues
+                    ?.nodes
+                    .orEmpty()
+                    .filterNotNull()
+                    .mapNotNull { it.toProjectField() },
+        )
+    }
+
+/**
+ * A board cell as one name/value pair, or null when there is nothing to show: a field type the
+ * query doesn't ask about arrives as an empty object, and an unset field carries no value.
+ */
+private fun GitHubProjectFieldValueDto.toProjectField(): IssueProjectField? {
+    val name = field?.name?.takeIf { it.isNotBlank() } ?: return null
+    val value =
+        text?.takeIf { it.isNotBlank() }
+            ?: this.name?.takeIf { it.isNotBlank() }
+            ?: title?.takeIf { it.isNotBlank() }
+            ?: date?.takeIf { it.isNotBlank() }
+            ?: number?.let { formatFieldNumber(it) }
+            ?: return null
+    return IssueProjectField(name, value)
+}
+
+/** Sizes and estimates are whole numbers far more often than not, and read better without the `.0`. */
+private fun formatFieldNumber(value: Double): String {
+    val whole = value.toLong()
+    return if (value == whole.toDouble()) whole.toString() else value.toString()
+}
 
 private val IGNORED_TIMELINE_EVENTS = setOf("subscribed", "unsubscribed", "mentioned")
 
@@ -155,10 +225,13 @@ class GitHubIssueProvider : IssueProvider {
     }
 
     /**
-     * Re-reads the issue rather than trusting the list row, then the history behind it.
+     * Re-reads the issue rather than trusting the list row, then the history behind it, then the
+     * two things only GraphQL knows: what is being built for the issue, and where it sits on a board.
      *
-     * The history is a second request and is allowed to fail on its own: a rate-limited or
-     * forbidden timeline shouldn't cost the user the description as well.
+     * Every request after the first is allowed to fail on its own. A rate-limited timeline shouldn't
+     * cost the user the description, and a token without `read:project` shouldn't cost them the
+     * development links — a section that couldn't be read comes back null and says so, which is not
+     * the same answer as an empty one.
      */
     override suspend fun fetchIssueDetail(
         project: Project,
@@ -172,7 +245,13 @@ class GitHubIssueProvider : IssueProvider {
                 .getOrDefault(emptyList())
                 .filterNot { it.event in IGNORED_TIMELINE_EVENTS }
                 .mapNotNull { it.toTimelineItem() }
-        return IssueDetail(issue = dto.toIssue(), bodyHtml = dto.bodyHtml, timeline = timeline)
+        return IssueDetail(
+            issue = dto.toIssue(),
+            bodyHtml = dto.bodyHtml,
+            timeline = timeline,
+            development = runCatching { client.fetchDevelopment(repo, token, issue.id).toDevelopment() }.getOrNull(),
+            projects = runCatching { client.fetchProjectItems(repo, token, issue.id).toProjectItems() }.getOrNull(),
+        )
     }
 
     /**

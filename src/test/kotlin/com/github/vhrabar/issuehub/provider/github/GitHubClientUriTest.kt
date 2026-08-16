@@ -83,6 +83,20 @@ class GitHubClientUriTest {
         )
     }
 
+    @Test
+    fun `graphql sits next to the rest base`() {
+        assertEquals("$BASE_URL/graphql", client.graphQlUri().toString())
+    }
+
+    /** Enterprise serves REST under `/api/v3`, and GraphQL as its sibling rather than below it. */
+    @Test
+    fun `an enterprise host keeps graphql beside its versioned rest path`() {
+        assertEquals(
+            "https://github.enterprise.test/api/graphql",
+            GitHubClient("https://github.enterprise.test/api/v3").graphQlUri().toString(),
+        )
+    }
+
     private fun filtered() =
         IssueQuery(
             state = IssueStateFilter.ALL,

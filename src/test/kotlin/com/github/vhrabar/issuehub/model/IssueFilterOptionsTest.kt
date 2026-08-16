@@ -63,7 +63,7 @@ class IssueFilterOptionsTest {
         title = "Issue $number",
         state = IssueState.OPEN,
         labels = listOf(IssueLabel("bug", "d73a4a")),
-        assignee = assignee?.let { IssueActor(it) },
+        assignees = listOfNotNull(assignee?.let { IssueActor(it) }),
         milestone = IssueMilestone(1, "v1.0"),
         author = author?.let { IssueActor(it) },
         url = "https://github.test/octocat/hello-world/issues/$number",
