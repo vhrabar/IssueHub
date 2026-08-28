@@ -158,7 +158,13 @@ internal class IssueHubSettingsPanel : JBPanel<IssueHubSettingsPanel>(BorderLayo
                 JButton(IssueHubBundle["settings.account.add"]).apply {
                     addActionListener { addAccount(provider) }
                 },
-            )        }
+            )
+            add(
+                JButton(IssueHubBundle["settings.account.addFromIde"]).apply {
+                    addActionListener { importAccount(provider) }
+                },
+            )
+        }
 
     private fun addAccount(provider: IssueProvider) {
         val dialog = AddAccountDialog(provider)
@@ -166,6 +172,30 @@ internal class IssueHubSettingsPanel : JBPanel<IssueHubSettingsPanel>(BorderLayo
         val entered = dialog.entered ?: return
         accept(provider, entered.serverUrl, entered.verification?.login.orEmpty(), entered.token, entered.verification)
     }
+
+    /**
+     * Reuses an account the IDE is already signed in with. The IDE issued that token for its own
+     * needs, so verify it like any other one; otherwise the user only finds out it can't read
+     * project boards when a section turns up empty.
+     */
+    private fun importAccount(provider: IssueProvider) {
+        val available = ChooseIdeAccountDialog.load(provider)
+        if (available.isEmpty()) {
+            Messages.showInfoMessage(this, IssueHubBundle["settings.account.ideNone"], IssueHubBundle["settings.account.ideDialogTitle"])
+            return
+        }
+        val dialog = ChooseIdeAccountDialog(available)
+        if (!dialog.showAndGet()) return
+        val chosen = dialog.chosen ?: return
+        val verification = verifyQuietly(provider, chosen.serverUrl, chosen.token)
+        accept(provider, chosen.serverUrl, verification?.login ?: chosen.login, chosen.token, verification)
+    }
+
+    private fun verifyQuietly(
+        provider: IssueProvider,
+        serverUrl: String,
+        token: String,
+    ): AccountVerification? = runCatching { verifyWithProgress(provider, serverUrl, token) }.getOrNull()
 
     private fun accept(
         provider: IssueProvider,

@@ -2,6 +2,7 @@ package com.github.vhrabar.issuehub.settings
 
 import com.github.vhrabar.issuehub.IssueHubBundle
 import com.github.vhrabar.issuehub.provider.AccountVerification
+import com.github.vhrabar.issuehub.provider.ImportableAccount
 import com.github.vhrabar.issuehub.provider.IssueProvider
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.progress.ProgressManager
@@ -9,6 +10,7 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.ui.components.ActionLink
 import com.intellij.ui.components.JBLabel
+import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
@@ -16,6 +18,7 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.runBlocking
 import javax.swing.JComponent
+import javax.swing.ListSelectionModel
 
 /** A token the user typed in, plus the result of checking it. */
 internal data class EnteredAccount(
@@ -104,5 +107,47 @@ internal class AddAccountDialog(
 
     private companion object {
         const val FIELD_COLUMNS = 32
+    }
+}
+
+/** Lets the user pick one of the accounts the IDE is already signed in with. */
+internal class ChooseIdeAccountDialog(
+    accounts: List<ImportableAccount>,
+) : DialogWrapper(true) {
+    private val list =
+        JBList(accounts).apply {
+            selectionMode = ListSelectionModel.SINGLE_SELECTION
+            selectedIndex = 0
+            cellRenderer =
+                com.intellij.ui.SimpleListCellRenderer.create<ImportableAccount>("") { account ->
+                    "${account.login} — ${account.serverUrl}"
+                }
+        }
+
+    val chosen: ImportableAccount? get() = list.selectedValue
+
+    init {
+        title = IssueHubBundle["settings.account.ideDialogTitle"]
+        init()
+    }
+
+    override fun getPreferredFocusedComponent(): JComponent = list
+
+    override fun createCenterPanel(): JComponent = list
+
+    companion object {
+        /**
+         * Loads them behind a progress dialog: every token comes out of the credential store,
+         * which may mean unlocking a keychain.
+         */
+        fun load(provider: IssueProvider): List<ImportableAccount> =
+            runCatching {
+                ProgressManager.getInstance().runProcessWithProgressSynchronously(
+                    ThrowableComputable { runBlocking { provider.importableAccounts() } },
+                    IssueHubBundle["settings.account.ideLoading"],
+                    true,
+                    null,
+                )
+            }.getOrDefault(emptyList())
     }
 }

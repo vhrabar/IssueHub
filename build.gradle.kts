@@ -13,10 +13,12 @@ dependencies {
     compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     testImplementation("junit:junit:4.13.2")
 
-    // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
     intellijPlatform {
         intellijIdea("2025.3")
         testFramework(TestFrameworkType.Platform)
+
+        // optional dep for reusing GH token
+        bundledPlugin("org.jetbrains.plugins.github")
     }
 }
 

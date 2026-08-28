@@ -1,0 +1,7 @@
+<!--
+  Loaded only when the IDE's GitHub plugin is installed. It contributes nothing on its own; it is
+  here to declare the optional dependency, which is what gives us access to that plugin's account
+  classes so we can offer accounts the user has already signed in with.
+-->
+<idea-plugin>
+</idea-plugin>

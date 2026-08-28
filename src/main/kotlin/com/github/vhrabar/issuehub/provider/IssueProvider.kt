@@ -44,6 +44,12 @@ interface IssueProvider {
     /** One line on what a token needs to carry, shown next to the field it is pasted into. */
     fun tokenHint(): String? = null
 
+    /**
+     * Accounts the IDE itself already holds for this provider, offered as an alternative to pasting
+     * a token. Empty when there are none, or when the IDE has no such notion for this provider.
+     */
+    suspend fun importableAccounts(): List<ImportableAccount> = emptyList()
+
     /** HR desc of src, or null */
     fun sourceLabel(project: Project): String?
 
