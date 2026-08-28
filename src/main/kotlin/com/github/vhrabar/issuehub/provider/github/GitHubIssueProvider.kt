@@ -1,5 +1,6 @@
 package com.github.vhrabar.issuehub.provider.github
 
+import com.github.vhrabar.issuehub.IssueHubBundle
 import com.github.vhrabar.issuehub.model.Issue
 import com.github.vhrabar.issuehub.model.IssueActor
 import com.github.vhrabar.issuehub.model.IssueDetail
@@ -15,6 +16,7 @@ import com.github.vhrabar.issuehub.model.IssueQuery
 import com.github.vhrabar.issuehub.model.IssueState
 import com.github.vhrabar.issuehub.model.IssueTimelineItem
 import com.github.vhrabar.issuehub.model.PullRequestState
+import com.github.vhrabar.issuehub.provider.AccountVerification
 import com.github.vhrabar.issuehub.provider.IssueProvider
 import com.github.vhrabar.issuehub.settings.IssueHubSecrets
 import com.intellij.openapi.project.Project
@@ -210,10 +212,39 @@ class GitHubIssueProvider : IssueProvider {
 
     override val identifier = PROVIDER_IDENTIFIER
     override val displayName = "GitHub"
+    override val defaultServerUrl = DEFAULT_SERVER_URL
 
     override fun isApplicable(project: Project): Boolean = RepoDetector.detect(project) != null
 
     override fun sourceLabel(project: Project): String? = RepoDetector.detect(project)?.toString()
+
+    /**
+     * Confirms a token by asking who it belongs to, and reads what it may do off the response.
+     *
+     * A token that GitHub won't publish scopes for is not a token without permissions, so nothing is
+     * reported missing there; the sidebar's Projects section will say for itself if it can't read.
+     */
+    override suspend fun verifyToken(
+        serverUrl: String,
+        token: String,
+    ): AccountVerification {
+        val viewer = GitHubClient(serverUrl).fetchViewer(token)
+        return AccountVerification(
+            login = viewer.login,
+            grantedScopes = viewer.scopes,
+            missingScopes =
+                viewer.scopes
+                    ?.takeIf { granted -> PROJECT_SCOPES.none { it in granted } }
+                    ?.let { listOf(PROJECT_SCOPES.first()) }
+                    .orEmpty(),
+        )
+    }
+
+    /** GitHub's token page, pre-filled with the scopes IssueHub asks for. */
+    override fun tokenPageUrl(serverUrl: String): String =
+        "${webUrl(serverUrl)}/settings/tokens/new?scopes=repo,read:project&description=IssueHub"
+
+    override fun tokenHint(): String = IssueHubBundle["settings.github.tokenHint"]
 
     override suspend fun fetchIssues(
         project: Project,
@@ -277,5 +308,20 @@ class GitHubIssueProvider : IssueProvider {
 
     companion object {
         const val PROVIDER_IDENTIFIER = "github"
+
+        const val DEFAULT_SERVER_URL = "https://api.github.com"
+
+        /** Either spelling lets a token read project boards; `read:project` is the one to ask for. */
+        private val PROJECT_SCOPES = listOf("read:project", "project")
+
+        /**
+         * The site behind an API root: `api.github.com` is served from `github.com`, and an
+         * Enterprise install puts its API under `HOST/api/v3` and its pages at `HOST`.
+         */
+        internal fun webUrl(serverUrl: String): String =
+            serverUrl
+                .removeSuffix("/")
+                .removeSuffix("/api/v3")
+                .replace("://api.", "://")
     }
 }

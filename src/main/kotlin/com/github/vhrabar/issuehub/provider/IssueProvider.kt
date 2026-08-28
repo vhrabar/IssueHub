@@ -11,8 +11,38 @@ interface IssueProvider {
     val identifier: String
     val displayName: String
 
+    /**
+     * The API root this provider talks to when the user hasn't named a server.
+     *
+     * An account always carries a server, even for a provider with only one, so that adding a
+     * self-hosted or Enterprise instance later changes settings rather than every call site.
+     */
+    val defaultServerUrl: String get() = ""
+
     /** whether this provider can serve the givenn project */
     fun isApplicable(project: Project): Boolean
+
+    /**
+     * Asks [serverUrl] who [token] belongs to, and what it is allowed to do.
+     *
+     * Throws when the token is refused — that is the answer the settings page shows. Providers that
+     * can't check a token are the ones that don't override this, and their accounts stay unverified.
+     */
+    suspend fun verifyToken(
+        serverUrl: String,
+        token: String,
+    ): AccountVerification? = null
+
+    /**
+     * Where the user creates a token for [serverUrl], if the provider has such a page.
+     *
+     * Providers spell this differently and put it in different places, so the settings page links
+     * to it rather than trying to explain where to look.
+     */
+    fun tokenPageUrl(serverUrl: String): String? = null
+
+    /** One line on what a token needs to carry, shown next to the field it is pasted into. */
+    fun tokenHint(): String? = null
 
     /** HR desc of src, or null */
     fun sourceLabel(project: Project): String?

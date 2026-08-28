@@ -28,6 +28,16 @@ class GitHubApiException(
     message: String,
 ) : Exception(message)
 
+/** The account behind a token, as `/user` and its headers describe it. */
+internal data class GitHubViewer(
+    val login: String,
+    /** Null when GitHub doesn't say, which is how a fine-grained token always answers. */
+    val scopes: List<String>?,
+)
+
+/** `X-OAuth-Scopes` is a comma-separated list, and empty for a token that was granted none. */
+internal fun parseScopes(header: String): List<String> = header.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+
 /** REST client based on teh the JDK [HttpClient] */
 internal class GitHubClient(
     private val baseUrl: String = "https://api.github.com",
@@ -113,6 +123,26 @@ internal class GitHubClient(
             "$baseUrl/repos/${repo.owner}/${repo.name}/issues/$number/timeline" +
                 "?per_page=$TIMELINE_PER_PAGE&page=$page",
         )
+
+    /**
+     * Who a token belongs to, and what it may do.
+     *
+     * The scopes ride on a response header rather than in the body, and a fine-grained token gets no
+     * such header at all — GitHub doesn't publish that kind of permission — so [GitHubViewer.scopes]
+     * comes back null there rather than empty.
+     */
+    suspend fun fetchViewer(token: String): GitHubViewer {
+        val response = getResponse(URI.create("$baseUrl/user"), token)
+        return GitHubViewer(
+            login = json.decodeFromString<GitHubUserDto>(response.body()).login,
+            scopes =
+                response
+                    .headers()
+                    .firstValue(SCOPES_HEADER)
+                    .orElse(null)
+                    ?.let(::parseScopes),
+        )
+    }
 
     /**
      * The pull requests and branches opened for an issue, GitHub's "Development" section.
@@ -267,7 +297,17 @@ internal class GitHubClient(
         token: String?,
         accept: String = ACCEPT_JSON,
         decode: (String) -> T,
-    ): T =
+    ): T = decode(getResponse(uri, token, accept).body())
+
+    /**
+     * The whole response, for the one call that cares about a header rather than the body: what a
+     * token is allowed to do is in `X-OAuth-Scopes`, not in any JSON GitHub sends back.
+     */
+    private suspend fun getResponse(
+        uri: URI,
+        token: String?,
+        accept: String = ACCEPT_JSON,
+    ): HttpResponse<String> =
         withContext(Dispatchers.IO) {
             val requestBuilder =
                 HttpRequest
@@ -286,7 +326,7 @@ internal class GitHubClient(
                 throw GitHubApiException(describeError(response.statusCode()))
             }
 
-            decode(response.body())
+            response
         }
 
     /** GraphQL is one POST to one address; the query travels in the body rather than the path. */
@@ -331,6 +371,9 @@ internal class GitHubClient(
 
         /** Adds `body_html` (and `body_text`) alongside the Markdown source. */
         const val ACCEPT_FULL = "application/vnd.github.full+json"
+
+        /** Where GitHub lists what a classic token was granted; absent for fine-grained ones. */
+        const val SCOPES_HEADER = "X-OAuth-Scopes"
 
         /** Filter dropdowns list every value at once; GitHub caps a page at 100. */
         const val OPTIONS_PER_PAGE = 100
