@@ -26,6 +26,12 @@
         <!-- Issues open in the editor area, not as tool window tabs. -->
         <fileEditorProvider implementation="com.github.vhrabar.issuehub.editor.IssueFileEditorProvider"/>
         <fileIconProvider implementation="com.github.vhrabar.issuehub.editor.IssueFileIconProvider"/>
+
+        <applicationConfigurable
+            parentId="tools"
+            id="com.github.vhrabar.issuehub.settings"
+            key="settings.displayName"
+            instance="com.github.vhrabar.issuehub.settings.IssueHubConfigurable"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.github.vhrabar.issuehub">

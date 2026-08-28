@@ -7,12 +7,11 @@ import com.github.vhrabar.issuehub.model.IssueFilterOptions
 import com.github.vhrabar.issuehub.model.IssueQuery
 import com.github.vhrabar.issuehub.model.optionsFrom
 import com.github.vhrabar.issuehub.provider.IssueProvider
-import com.github.vhrabar.issuehub.provider.github.GitHubIssueProvider
-import com.github.vhrabar.issuehub.settings.IssueHubSecrets
+import com.github.vhrabar.issuehub.settings.IssueHubConfigurable
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.openapi.wm.impl.content.ToolWindowContentUi
@@ -159,10 +158,13 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                     addActionListener { refresh(reloadOptions = true) }
                 },
             )
-            // TODO: temporary placeholder until a proper settings UI exists.
             actions.add(
-                JButton(IssueHubBundle["toolWindow.addToken"]).apply {
-                    addActionListener { promptForToken() }
+                JButton(IssueHubBundle["toolWindow.settings"]).apply {
+                    // Reloads on the way back: the accounts page is where a token is added or dropped.
+                    addActionListener {
+                        ShowSettingsUtil.getInstance().showSettingsDialog(project, IssueHubConfigurable::class.java)
+                        refresh(reloadOptions = true)
+                    }
                 },
             )
             return actions
@@ -217,26 +219,6 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                             filterBar.setOptions(providerOptions.mergedWith(discoveredOptions))
                             showIssues(issues, query)
                         }.onFailure { showStatus(IssueHubBundle["toolWindow.error", it.message ?: it.toString()]) }
-                }
-            }
-        }
-
-        private fun promptForToken() {
-            val token =
-                Messages
-                    .showPasswordDialog(
-                        IssueHubBundle["toolWindow.addToken.message"],
-                        IssueHubBundle["toolWindow.addToken.title"],
-                    )?.takeIf { it.isNotBlank() } ?: return
-
-            ApplicationManager.getApplication().executeOnPooledThread {
-                IssueHubSecrets.setToken(GitHubIssueProvider.PROVIDER_IDENTIFIER, token)
-                ApplicationManager.getApplication().invokeLater {
-                    Messages.showInfoMessage(
-                        IssueHubBundle["toolWindow.addToken.saved"],
-                        IssueHubBundle["toolWindow.addToken.title"],
-                    )
-                    refresh(reloadOptions = true)
                 }
             }
         }
