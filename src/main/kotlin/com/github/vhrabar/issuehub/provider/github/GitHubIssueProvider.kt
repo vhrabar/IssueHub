@@ -18,8 +18,9 @@ import com.github.vhrabar.issuehub.model.IssueTimelineItem
 import com.github.vhrabar.issuehub.model.PullRequestState
 import com.github.vhrabar.issuehub.provider.AccountVerification
 import com.github.vhrabar.issuehub.provider.IssueProvider
-import com.github.vhrabar.issuehub.settings.IssueHubSecrets
+import com.github.vhrabar.issuehub.settings.IssueHubAccounts
 import com.intellij.openapi.project.Project
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.collections.map
 
 private fun GitHubUserDto.toActor(): IssueActor = IssueActor(login, avatarUrl)
@@ -208,7 +209,8 @@ private const val API_COMMITS_PATH = "/commits/"
 private const val WEB_COMMIT_PATH = "/commit/"
 
 class GitHubIssueProvider : IssueProvider {
-    private var client = GitHubClient()
+    /** One client per server: a user can hold a github.com account and an Enterprise one at once. */
+    private val clients = ConcurrentHashMap<String, GitHubClient>()
 
     override val identifier = PROVIDER_IDENTIFIER
     override val displayName = "GitHub"
@@ -228,7 +230,7 @@ class GitHubIssueProvider : IssueProvider {
         serverUrl: String,
         token: String,
     ): AccountVerification {
-        val viewer = GitHubClient(serverUrl).fetchViewer(token)
+        val viewer = client(serverUrl).fetchViewer(token)
         return AccountVerification(
             login = viewer.login,
             grantedScopes = viewer.scopes,
@@ -251,7 +253,7 @@ class GitHubIssueProvider : IssueProvider {
         query: IssueQuery,
     ): List<Issue> {
         val repo = RepoDetector.detect(project) ?: return emptyList()
-        val token = IssueHubSecrets.getToken(identifier)
+        val (client, token) = session()
         return client.fetchIssues(repo, token, query).map { it.toIssue() }
     }
 
@@ -269,7 +271,7 @@ class GitHubIssueProvider : IssueProvider {
         issue: Issue,
     ): IssueDetail? {
         val repo = RepoDetector.detect(project) ?: return null
-        val token = IssueHubSecrets.getToken(identifier)
+        val (client, token) = session()
         val dto = client.fetchIssue(repo, token, issue.id)
         val timeline =
             runCatching { client.fetchTimeline(repo, token, issue.id) }
@@ -291,7 +293,7 @@ class GitHubIssueProvider : IssueProvider {
      */
     override suspend fun fetchFilterOptions(project: Project): IssueFilterOptions {
         val repo = RepoDetector.detect(project) ?: return IssueFilterOptions()
-        val token = IssueHubSecrets.getToken(identifier)
+        val (client, token) = session()
         val assignees = runCatching { client.fetchAssignableUsers(repo, token).map { it.login } }.getOrDefault(emptyList())
         return IssueFilterOptions(
             labels =
@@ -305,6 +307,21 @@ class GitHubIssueProvider : IssueProvider {
             authors = assignees,
         )
     }
+
+    /**
+     * The client and token to work through: whichever account is configured for GitHub, or an
+     * unauthenticated client against github.com when there is none.
+     *
+     * Public repositories answer without a token, at a much lower rate limit, which is why the
+     * absence of an account isn't an error here.
+     */
+    private fun session(): Pair<GitHubClient, String?> {
+        val accounts = IssueHubAccounts.getInstance()
+        val account = accounts.defaultAccountFor(identifier) ?: accounts.adoptLegacyToken(identifier, defaultServerUrl)
+        return client(account?.serverUrl ?: defaultServerUrl) to account?.let { accounts.token(it) }
+    }
+
+    private fun client(serverUrl: String): GitHubClient = clients.getOrPut(serverUrl) { GitHubClient(serverUrl) }
 
     companion object {
         const val PROVIDER_IDENTIFIER = "github"
