@@ -10,11 +10,6 @@
 [![Downloads](https://img.shields.io/jetbrains/plugin/d/33044.svg?style=for-the-badge)](https://plugins.jetbrains.com/plugin/33044)
 
 
-
->  **Alpha.** Core flow works (detect repo > add token > browse, filter and read issues).
-> Configuration is a placeholder, GitHub is the only supported provider, and IssueHub reads issues
-> only, it never writes.
-
 <!-- Plugin description -->
 **IssueHub** brings your GitHub issues into the IDE. Browse and open issues for the current
 repository from a dedicated tool window, without leaving your editor.
@@ -31,7 +26,10 @@ repository from a dedicated tool window, without leaving your editor.
   size, estimate and dates), milestone, and the pull requests and branches opened for it in a
   sidebar beside the thread, the way GitHub's own issue page does
 - Jumps to the issue on GitHub whenever you need the browser
-- Stores your GitHub token in the IDE's secure credential store
+- Keeps accounts under **Settings | Tools | IssueHub**: paste a token and have it checked against the
+  server before it is saved, or adopt a GitHub account your IDE is already signed in with, on
+  github.com or on an Enterprise host
+- Stores every token in the IDE's secure credential store, never in plain text
 
 <!-- Plugin description end -->
 
@@ -40,14 +38,23 @@ repository from a dedicated tool window, without leaving your editor.
 1. Open a project whose Git remote points at a GitHub repository, IssueHub reads the repo from
    `.git/config` automatically.
 2. Open the **IssueHub** tool window.
-3. Click **Add Token…** and paste a GitHub personal access token (stored in the IDE's secure
-   credential store, never in plain text).
+3. Click **Settings…** to open **Settings | Tools | IssueHub**, then add an account: paste a personal
+   access token, or pick one of the GitHub accounts the IDE is already signed in with under
+   *Settings | Version Control | GitHub*. The token is checked before it is saved, and the page then
+   shows whose account it is and which scopes it carries. Public repositories are readable without an
+   account, at a much lower rate limit.
 4. Click **Refresh** to load issues. Double-click an issue to open it as an editor tab, titled with
    the issue number; **Open on GitHub** there opens the same issue in your browser.
 5. The issue tab shows the description and, below it, the issue's history as a thread of cards:
    comments plus the closes, reopens, label, assignee and milestone changes and title edits around
    them. **Refresh** in that tab re-reads the issue from GitHub.
-6. Use the search field and the **State / Author / Assignee / Label / Milestone / Sort** dropdowns to
+6. The sidebar down the right of that tab carries **Assignees**, **Labels**, **Projects**,
+   **Milestone** and **Development**, the way GitHub's own issue page does. **Projects** lists each
+   board the issue is on together with that board's own fields for it, whatever they are called:
+   status, size, estimate, start and target dates, iteration. **Development** lists the pull requests
+   that will close the issue, marked open, draft, merged or closed, and the branches opened for it.
+   Drag the divider to resize the sidebar; the IDE remembers where you left it.
+7. Use the search field and the **State / Author / Assignee / Label / Milestone / Sort** dropdowns to
    narrow the list; **Reset** clears everything back to open issues, newest first.
 
 Filtering and sorting run on GitHub's side, so the results are the whole repository's issues, not
@@ -62,9 +69,13 @@ considerably.
 | **Public** | none, or any token | Reads without authentication (60 req/hr); any token, even one with **no scopes**, just raises the rate limit.                                            |
 | **Private** | fine-grained PAT | Repository access + **Issues: Read-only** (Metadata: Read is included automatically).                                                                    |
 | **Private** | classic PAT | `repo`: note this is the *only* classic scope that reads private repos, and it grants full read/write. Prefer a fine-grained token for read-only access. |
+| **Any**, for the sidebar's **Projects** and **Development** | fine-grained or classic | Both read GitHub's GraphQL API, which needs a token even on a public repo. Boards additionally need **Projects: Read-only** (fine-grained) or `read:project` (classic). |
 
 IssueHub only reads issues (for now), so it never needs write access. For private repos, prefer a
-fine-grained token with **Issues: Read-only** as classic tokens can't scope down to read-only.
+fine-grained token with **Issues: Read-only** as classic tokens can't scope down to read-only. Once an
+account is saved, the accounts page lists the scopes its token actually carries and warns when
+`read:project` is missing; GitHub publishes no scopes for fine-grained tokens, so for those it says so
+instead of guessing.
 
 ## Installation
 
