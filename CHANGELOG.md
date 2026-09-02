@@ -29,6 +29,7 @@
 ### Compatibility
 
 - Verified against IntelliJ Platform 2025.3 through 2026.2rc
+- No internal, deprecated or scheduled-for-removal platform API is used any longer.
 
 ## [0.0.4] - 2026-08-04
 
