@@ -4,8 +4,6 @@
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-09-02
-
 ### Added
 
 - **Settings | Tools | IssueHub** accounts page, with one section per provider listing the accounts stored for it, an **Add Account…** dialog and a **Remove** action. Accounts are application-level, so they are shared by every project.
