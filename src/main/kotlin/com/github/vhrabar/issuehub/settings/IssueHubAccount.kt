@@ -18,5 +18,6 @@ data class IssueHubAccount(
     /** Empty until the token has been checked against the server. */
     val login: String = "",
 ) {
+    @Suppress("unused")
     val isVerified: Boolean get() = login.isNotBlank()
 }

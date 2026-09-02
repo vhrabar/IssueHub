@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 package com.github.vhrabar.issuehub.settings
 
 import com.intellij.openapi.components.BaseState

@@ -322,7 +322,7 @@ internal class GitHubClient(
 
             val response = http.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString())
             if (response.statusCode() !in 200..299) {
-                thisLogger().warn("GitHub API returned ${response.statusCode()} for ${uri.path}")
+                thisLogger().warn("GET:GitHub API returned ${response.statusCode()} for ${uri.path}")
                 throw GitHubApiException(describeError(response.statusCode()))
             }
 
@@ -350,7 +350,7 @@ internal class GitHubClient(
 
             val response = http.send(request, HttpResponse.BodyHandlers.ofString())
             if (response.statusCode() !in 200..299) {
-                thisLogger().warn("GitHub API returned ${response.statusCode()} for ${uri.path}")
+                thisLogger().warn("POST:GitHub API returned ${response.statusCode()} for ${uri.path}")
                 throw GitHubApiException(describeError(response.statusCode()))
             }
 
