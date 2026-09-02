@@ -8,6 +8,7 @@ import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
@@ -48,10 +49,12 @@ internal class IssueDetailPanel(
             iconTextGap = JBUI.scale(6)
         }
     private val byline = JBLabel().apply { foreground = UIUtil.getContextHelpForeground() }
-    private val metaRow = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, JBUI.scale(8), JBUI.scale(2)))
 
     /** Description and history, as one card per run of activity by the same account. */
     private val thread = IssueThreadPanel()
+
+    /** Assignees, labels, projects, milestone and linked work, down the right the way GitHub has them. */
+    private val sidebar = IssueSidebarPanel()
 
     private val statusLabel = JBLabel(IssueHubBundle["detail.loading"])
     private val cardLayout = CardLayout()
@@ -76,12 +79,26 @@ internal class IssueDetailPanel(
     /** Guards against a slow reload landing after a newer one. */
     private var requestId = 0
 
+    /**
+     * Thread and sidebar side by side, on a divider the user can move and the IDE remembers, since
+     * how much room a sidebar deserves depends on the boards a repository keeps.
+     */
+    private val body =
+        OnePixelSplitter(false, SIDEBAR_PROPORTION_KEY, SIDEBAR_PROPORTION).apply {
+            firstComponent = center
+            secondComponent =
+                JBScrollPane(sidebar).apply {
+                    horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
+                    border = JBUI.Borders.empty()
+                }
+        }
+
     /** The thread, so an editor host can hand it the focus and arrow keys scroll straight away. */
     internal fun preferredFocusComponent(): JComponent = thread
 
     init {
         add(header(), BorderLayout.NORTH)
-        add(center, BorderLayout.CENTER)
+        add(body, BorderLayout.CENTER)
         renderHeader()
         refresh()
     }
@@ -99,14 +116,7 @@ internal class IssueDetailPanel(
                 },
                 BorderLayout.NORTH,
             )
-            add(
-                JBPanel<JBPanel<*>>(BorderLayout()).apply {
-                    isOpaque = false
-                    add(byline, BorderLayout.NORTH)
-                    add(metaRow, BorderLayout.CENTER)
-                },
-                BorderLayout.CENTER,
-            )
+            add(byline, BorderLayout.CENTER)
         }
 
     private fun actions(): JBPanel<*> =
@@ -141,38 +151,8 @@ internal class IssueDetailPanel(
         byline.icon = issue.author?.let { avatarLoader.avatar(it.avatarUrl, IssueAvatarIcon(it.login)) }
         byline.iconTextGap = JBUI.scale(6)
 
-        renderMeta()
         revalidate()
         repaint()
-    }
-
-    /** Labels, assignee and milestone as one wrapping row of chips. */
-    private fun renderMeta() {
-        metaRow.removeAll()
-        metaRow.isOpaque = false
-
-        issue.labels.forEach { label ->
-            metaRow.add(
-                JBLabel(label.name).apply {
-                    icon = IssueLabelIcon(labelTint(label.color, UIUtil.getPanelBackground()))
-                    iconTextGap = JBUI.scale(4)
-                },
-            )
-        }
-        metaRow.add(
-            issue.assignee.let { assignee ->
-                JBLabel(assignee?.let { IssueHubBundle["issue.assignedTo", it.login] } ?: IssueHubBundle["detail.unassigned"]).apply {
-                    foreground = UIUtil.getContextHelpForeground()
-                    icon = assignee?.let { avatarLoader.avatar(it.avatarUrl, IssueAvatarIcon(it.login)) }
-                    iconTextGap = JBUI.scale(4)
-                }
-            },
-        )
-        metaRow.add(
-            JBLabel(issue.milestone?.title ?: IssueHubBundle["detail.noMilestone"]).apply {
-                foreground = UIUtil.getContextHelpForeground()
-            },
-        )
     }
 
     /**
@@ -188,6 +168,7 @@ internal class IssueDetailPanel(
         val id = ++requestId
         statusLabel.text = IssueHubBundle["detail.loading"]
         cardLayout.show(center, STATUS_CARD)
+        sidebar.showLoading(issue)
 
         ApplicationManager.getApplication().executeOnPooledThread {
             val result = runCatching { runBlocking { provider.fetchIssueDetail(project, issue) } }
@@ -201,6 +182,8 @@ internal class IssueDetailPanel(
                     }.onFailure {
                         statusLabel.text = IssueHubBundle["detail.error", it.message ?: it.toString()]
                         cardLayout.show(center, STATUS_CARD)
+                        // The sidebar keeps what the list row knows rather than waiting on a request that failed.
+                        sidebar.show(issue, null)
                     }
             }
         }
@@ -212,11 +195,16 @@ internal class IssueDetailPanel(
      */
     private fun showBody(detail: IssueDetail?) {
         thread.show(issueThread(issue, detail))
+        sidebar.show(issue, detail)
         cardLayout.show(center, BODY_CARD)
     }
 
     private companion object {
         const val STATUS_CARD = "status"
         const val BODY_CARD = "body"
+
+        /** Wide enough for the thread to keep its cards readable, with the column beside it. */
+        const val SIDEBAR_PROPORTION = 0.75f
+        const val SIDEBAR_PROPORTION_KEY = "IssueHub.detail.sidebar"
     }
 }

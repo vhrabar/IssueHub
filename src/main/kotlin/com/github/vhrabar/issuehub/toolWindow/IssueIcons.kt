@@ -2,6 +2,7 @@ package com.github.vhrabar.issuehub.toolWindow
 
 import com.github.vhrabar.issuehub.model.IssueLabel
 import com.github.vhrabar.issuehub.model.IssueState
+import com.github.vhrabar.issuehub.model.PullRequestState
 import com.intellij.ui.ColorUtil
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBUI
@@ -25,12 +26,25 @@ private val OPEN_COLOR = JBColor(Color(0x1A7F37), Color(0x3FB950))
 private val CLOSED_COLOR = JBColor(Color(0x8250DF), Color(0xA371F7))
 private val OTHER_COLOR = JBColor(Color(0x6E7781), Color(0x8B949E))
 
+/** A closed pull request is red where a closed issue is purple; purple is what merged means here. */
+private val MERGED_COLOR = JBColor(Color(0x8250DF), Color(0xA371F7))
+private val PR_CLOSED_COLOR = JBColor(Color(0xCF222E), Color(0xF85149))
+
 internal val IssueState.dotColor: Color
     get() =
         when (this) {
             IssueState.OPEN -> OPEN_COLOR
             IssueState.CLOSED -> CLOSED_COLOR
             IssueState.OTHER -> OTHER_COLOR
+        }
+
+internal val PullRequestState.dotColor: Color
+    get() =
+        when (this) {
+            PullRequestState.OPEN -> OPEN_COLOR
+            PullRequestState.DRAFT -> OTHER_COLOR
+            PullRequestState.MERGED -> MERGED_COLOR
+            PullRequestState.CLOSED -> PR_CLOSED_COLOR
         }
 
 /** Fallback for labels the API returned without a color. */
@@ -271,14 +285,15 @@ internal class IssueEventIcon(
     }
 }
 
-/**
- * A filled circle marking issue state, sized to sit on the title baseline.
- *
- * [size] is the box the dot is centred in: the default suits label text, 16 matches an editor tab.
- */
-internal class IssueStateIcon(
-    private val state: IssueState,
-    private val size: Int = SIZE,
+/** The box a state dot is centred in: the default suits label text, 16 matches an editor tab. */
+private const val DOT_SIZE = 12
+
+private const val DOT_RATIO = 2.0 / 3.0
+
+/** A filled circle in [color], sized to sit on the baseline of the text beside it. */
+internal open class DotIcon(
+    private val color: Color,
+    private val size: Int = DOT_SIZE,
 ) : Icon {
     override fun getIconWidth(): Int = JBUI.scale(size)
 
@@ -295,18 +310,25 @@ internal class IssueStateIcon(
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             val d = JBUI.scale(size) * DOT_RATIO
             val offset = (JBUI.scale(size) - d) / 2
-            g2.color = state.dotColor
+            g2.color = color
             g2.fill(Ellipse2D.Double(x + offset, y + offset, d, d))
         } finally {
             g2.dispose()
         }
     }
-
-    private companion object {
-        const val SIZE = 12
-        const val DOT_RATIO = 2.0 / 3.0
-    }
 }
+
+/** A dot marking issue state, in the same green and purple GitHub uses. */
+internal class IssueStateIcon(
+    state: IssueState,
+    size: Int = DOT_SIZE,
+) : DotIcon(state.dotColor, size)
+
+/** A dot marking pull request state, which has a merged and a draft where an issue has neither. */
+internal class PullRequestStateIcon(
+    state: PullRequestState,
+    size: Int = DOT_SIZE,
+) : DotIcon(state.dotColor, size)
 
 /**
  * A label/tag pennant filled with the label's own color.

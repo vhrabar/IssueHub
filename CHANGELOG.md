@@ -4,6 +4,30 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Settings | Tools | IssueHub** accounts page, with one section per provider listing the accounts stored for it, an **Add Account…** dialog and a **Remove** action. Accounts are application-level, so they are shared by every project.
+- Several accounts at once, each keyed to its own server and login, so a work GitHub Enterprise host can sit next to github.com.
+- **Use an Account from the IDE…**, which offers the GitHub accounts already signed in under *Settings | Version Control | GitHub* instead of requiring a special token. The IDE's GitHub plugin is an optional dependency, so IssueHub can work without it.
+- Tokens are checked against the server when added: the page shows who the token belongs to, the scopes it carries, and warns when `read:project` is missing rather than rejecting the account. Fine-grained tokens, whose scopes GitHub doesn't publish, are reported as such rather than as having none.
+- **Create a token on the server…** link that opens GitHub's token page pre-filled with the scopes IssueHub asks for, plus a hint on what a token needs to carry.
+- Sidebar down the right of an issue, in the order GitHub's own page uses: assignees, labels, projects, milestone and development. It shows what the list row already knows while the rest is fetched, and sits on a splitter whose position the IDE remembers.
+- The **Projects** section lists each board the issue sits on together with the fields that board keeps for it — status, size, estimate, start and target dates, iteration — whatever the board's owner named them.
+- The **Development** section lists the pull requests and branches opened for the issue, distinguishing draft, open, merged and closed.
+- GitHub GraphQL support behind the two sections REST can't serve, including Enterprise hosts (`HOST/api/graphql` alongside the REST root at `HOST/api/v3`).
+
+### Changed
+
+- The tool window's **Add Token…** placeholder is gone; a **Settings…** button opens the accounts page and the list reloads on the way back.
+- Tokens are stored per account rather than per provider. A token saved by an earlier version is adopted into an account on first use.
+- An issue carries all of its assignees instead of just one; single-line views still show the first.
+- Labels, assignee and milestone moved out of the issue header's chip row and into the sidebar.
+- A section the provider couldn't read says so, instead of being shown as empty, a token without `read:project` scope is warned about.
+
+### Compatibility
+
+- Verified against IntelliJ Platform 2025.3 through 2026.2rc
+
 ## [0.0.4] - 2026-08-04
 
 ### Added
@@ -83,17 +107,17 @@
 
 ### Added
 
-- **IssueHub** tool window that lists issues for the current repository, with a **Refresh** action and double-click to open an issue in the browser.                                                                                                                                                                                                                            
-- Automatic GitHub repository detection from the project's `.git/config`.                                                                                                                                                                                                                                                                                                       
-- **Add Token…** action that stores a GitHub personal access token in the IDE's secure credential store (`PasswordSafe`), read-only scope is enough.                                                                                                                                                                                                                           
-- Issue rows showing basic info                                                                                                                                                                                                                                                                                
-- Pluggable issue-provider extension point (`com.github.vhrabar.issuehub.issueProvider`) with a GitHub implementation.                                                                                                                                                                                                                                                          
+- **IssueHub** tool window that lists issues for the current repository, with a **Refresh** action and double-click to open an issue in the browser.
+- Automatic GitHub repository detection from the project's `.git/config`.
+- **Add Token…** action that stores a GitHub personal access token in the IDE's secure credential store (`PasswordSafe`), read-only scope is enough.
+- Issue rows showing basic info
+- Pluggable issue-provider extension point (`com.github.vhrabar.issuehub.issueProvider`) with a GitHub implementation.
 
 ### Known limitations
 
-- Token entry is a temporary placeholder; there is no dedicated settings/configuration UI yet.                                                                                                                                                                                                                                                                                  
-- GitHub is the only supported provider.                                                                                                                                                                                                                                                                                                                                        
-- The list shows the 50 most recent open issues; no search or filtering.                                                                                                                                                                                                                                                                                                        
+- Token entry is a temporary placeholder; there is no dedicated settings/configuration UI yet.
+- GitHub is the only supported provider.
+- The list shows the 50 most recent open issues; no search or filtering.
 
 ### Compatibility
 

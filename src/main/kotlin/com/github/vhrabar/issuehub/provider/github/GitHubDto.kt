@@ -42,6 +42,7 @@ internal data class GitHubIssueDto(
     @SerialName("body_html") val bodyHtml: String? = null,
     val labels: List<GitHubLabelDto> = emptyList(),
     val assignee: GitHubUserDto? = null,
+    val assignees: List<GitHubUserDto> = emptyList(),
     val milestone: GitHubMilestoneDto? = null,
     val user: GitHubUserDto? = null,
     val comments: Int = 0,

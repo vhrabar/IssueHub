@@ -29,6 +29,31 @@ class GitHubIssueDtoTest {
         assertNull(dto.bodyHtml)
     }
 
+    @Test
+    fun `every assignee is kept, not just the first`() {
+        val issue =
+            json
+                .decodeFromString<GitHubIssueDto>(
+                    issueJson("""  "assignees": [{"login": "mia"}, {"login": "adam"}],"""),
+                ).toIssue()
+
+        assertEquals(listOf("mia", "adam"), issue.assignees.map { it.login })
+        assertEquals("mia", issue.assignee?.login)
+    }
+
+    /** Older payloads name only the single `assignee`, which is still someone the issue is on. */
+    @Test
+    fun `a lone assignee field stands in for the list`() {
+        val issue = json.decodeFromString<GitHubIssueDto>(issueJson("""  "assignee": {"login": "mia"},""")).toIssue()
+
+        assertEquals(listOf("mia"), issue.assignees.map { it.login })
+    }
+
+    @Test
+    fun `an issue nobody is on has no assignees`() {
+        assertEquals(emptyList<String>(), json.decodeFromString<GitHubIssueDto>(issueJson("")).toIssue().assignees)
+    }
+
     private fun issueJson(bodyHtml: String) =
         """
         {

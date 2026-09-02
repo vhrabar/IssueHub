@@ -7,6 +7,9 @@
 
     <depends>com.intellij.modules.platform</depends>
 
+    <!-- Only to borrow accounts the user has already signed in with; IssueHub works without it. -->
+    <depends optional="true" config-file="issuehub-withGitHubPlugin.xml">org.jetbrains.plugins.github</depends>
+
     <resource-bundle>messages.IssueHubBundle</resource-bundle>
 
     <extensionPoints>
@@ -26,6 +29,12 @@
         <!-- Issues open in the editor area, not as tool window tabs. -->
         <fileEditorProvider implementation="com.github.vhrabar.issuehub.editor.IssueFileEditorProvider"/>
         <fileIconProvider implementation="com.github.vhrabar.issuehub.editor.IssueFileIconProvider"/>
+
+        <applicationConfigurable
+            parentId="tools"
+            id="com.github.vhrabar.issuehub.settings"
+            key="settings.displayName"
+            instance="com.github.vhrabar.issuehub.settings.IssueHubConfigurable"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.github.vhrabar.issuehub">
