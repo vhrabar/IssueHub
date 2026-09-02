@@ -20,6 +20,7 @@ class AccountEntry : BaseState() {
 
 class AccountsState : BaseState() {
     val accounts by list<AccountEntry>()
+
     fun changed() = incrementModificationCount()
 }
 
