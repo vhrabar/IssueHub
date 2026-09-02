@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-02
+
 ### Added
 
 - **Settings | Tools | IssueHub** accounts page, with one section per provider listing the accounts stored for it, an **Add Account…** dialog and a **Remove** action. Accounts are application-level, so they are shared by every project.
@@ -32,7 +34,6 @@
 ## [0.1.0] - 2026-09-02 [YANKED]
 
 - Withdrawn. The upload was rejected by the JetBrains Marketplace over the plugin's use of internal and deprecated platform API.
-
 
 ## [0.0.4] - 2026-08-04
 
@@ -129,7 +130,8 @@
 
 - Verified against IntelliJ Platform 2025.2 through 2026.2
 
-[Unreleased]: https://github.com/vhrabar/IssueHub/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/vhrabar/IssueHub/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/vhrabar/IssueHub/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/vhrabar/IssueHub/compare/v0.0.4...v0.1.0
 [0.0.4]: https://github.com/vhrabar/IssueHub/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/vhrabar/IssueHub/compare/v0.0.2...v0.0.3
