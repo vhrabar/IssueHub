@@ -1,6 +1,6 @@
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
-import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
+import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -55,6 +55,10 @@ intellijPlatform {
 // pin JVM 21
 kotlin {
     jvmToolchain(21)
+
+    compilerOptions {
+        jvmDefault = JvmDefaultMode.NO_COMPATIBILITY
+    }
 }
 
 // ktlint-backed formatting: `./gradlew spotlessApply` to fix, `spotlessCheck` (wired into `check`) to verify.

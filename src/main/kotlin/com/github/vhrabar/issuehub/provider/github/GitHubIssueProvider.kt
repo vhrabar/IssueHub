@@ -17,12 +17,11 @@ import com.github.vhrabar.issuehub.model.IssueState
 import com.github.vhrabar.issuehub.model.IssueTimelineItem
 import com.github.vhrabar.issuehub.model.PullRequestState
 import com.github.vhrabar.issuehub.provider.AccountVerification
+import com.github.vhrabar.issuehub.provider.IdeAccountImporter
 import com.github.vhrabar.issuehub.provider.ImportableAccount
 import com.github.vhrabar.issuehub.provider.IssueProvider
 import com.github.vhrabar.issuehub.settings.IssueHubAccounts
-import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.diagnostic.thisLogger
-import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.collections.map
@@ -255,17 +254,17 @@ class GitHubIssueProvider : IssueProvider {
     /**
      * The accounts the IDE's own GitHub plugin holds, when that plugin is installed.
      *
-     * The check keeps [IdeGitHubAccounts] — the only class that names anything from that plugin —
-     * from being loaded at all when it isn't there, and the catch covers the rest: its account API
-     * is internal to the IDE and has changed shape before. Either way the user still has the token
-     * field, so a failure costs a shortcut rather than the feature.
+     * There is an importer registered only while that plugin is loaded, so an empty list here is
+     * the "not installed" answer, and the catch covers the rest: its account API is internal to the
+     * IDE and has changed shape before. Either way the user still has the token field, so a failure
+     * costs a shortcut rather than the feature.
      */
-    override suspend fun importableAccounts(): List<ImportableAccount> {
-        if (PluginManagerCore.getPlugin(PluginId.getId(IDE_GITHUB_PLUGIN_ID))?.isEnabled != true) return emptyList()
-        return runCatching { IdeGitHubAccounts.accounts() }
-            .onFailure { thisLogger().info("Could not read the IDE's GitHub accounts", it) }
-            .getOrDefault(emptyList())
-    }
+    override suspend fun importableAccounts(): List<ImportableAccount> =
+        IdeAccountImporter.forProvider(PROVIDER_IDENTIFIER).flatMap { importer ->
+            runCatching { importer.accounts() }
+                .onFailure { thisLogger().info("Could not read the IDE's GitHub accounts", it) }
+                .getOrDefault(emptyList())
+        }
 
     override suspend fun fetchIssues(
         project: Project,
@@ -346,9 +345,6 @@ class GitHubIssueProvider : IssueProvider {
         const val PROVIDER_IDENTIFIER = "github"
 
         const val DEFAULT_SERVER_URL = "https://api.github.com"
-
-        /** The IDE's own GitHub plugin, whose accounts we offer to borrow when it is installed. */
-        private const val IDE_GITHUB_PLUGIN_ID = "org.jetbrains.plugins.github"
 
         /** Either spelling lets a token read project boards; `read:project` is the one to ask for. */
         private val PROJECT_SCOPES = listOf("read:project", "project")

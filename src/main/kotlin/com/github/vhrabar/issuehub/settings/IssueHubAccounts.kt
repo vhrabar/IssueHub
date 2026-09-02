@@ -20,6 +20,7 @@ class AccountEntry : BaseState() {
 
 class AccountsState : BaseState() {
     val accounts by list<AccountEntry>()
+    fun changed() = incrementModificationCount()
 }
 
 /**
@@ -54,7 +55,7 @@ class IssueHubAccounts : SimplePersistentStateComponent<AccountsState>(AccountsS
     ): IssueHubAccount {
         val account = IssueHubAccount(UUID.randomUUID().toString(), providerId, serverUrl, login)
         state.accounts.add(account.toEntry())
-        state.intIncrementModificationCount()
+        state.changed()
         IssueHubSecrets.setToken(account.id, token)
         return account
     }
@@ -65,12 +66,12 @@ class IssueHubAccounts : SimplePersistentStateComponent<AccountsState>(AccountsS
         entry.providerId = account.providerId
         entry.serverUrl = account.serverUrl
         entry.login = account.login
-        state.intIncrementModificationCount()
+        state.changed()
     }
 
     fun remove(account: IssueHubAccount) {
         state.accounts.removeAll { it.id == account.id }
-        state.intIncrementModificationCount()
+        state.changed()
         IssueHubSecrets.setToken(account.id, null)
     }
 
