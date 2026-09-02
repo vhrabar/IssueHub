@@ -29,6 +29,12 @@
 ### Compatibility
 
 - Verified against IntelliJ Platform 2025.3 through 2026.2rc
+- No internal, deprecated or scheduled-for-removal platform API is used any longer.
+
+## [0.1.0] - 2026-09-02 [YANKED]
+
+- Withdrawn. The upload was rejected by the JetBrains Marketplace over the plugin's use of internal and deprecated platform API.
+
 
 ## [0.0.4] - 2026-08-04
 

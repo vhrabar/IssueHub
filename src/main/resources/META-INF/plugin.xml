@@ -17,6 +17,11 @@
             name="issueProvider"
             interface="com.github.vhrabar.issuehub.provider.IssueProvider"
             dynamic="true"/>
+
+        <extensionPoint
+            name="ideAccountImporter"
+            interface="com.github.vhrabar.issuehub.provider.IdeAccountImporter"
+            dynamic="true"/>
     </extensionPoints>
 
     <extensions defaultExtensionNs="com.intellij">

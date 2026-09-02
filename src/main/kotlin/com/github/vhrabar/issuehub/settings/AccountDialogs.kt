@@ -13,6 +13,7 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
+import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
@@ -119,9 +120,7 @@ internal class ChooseIdeAccountDialog(
             selectionMode = ListSelectionModel.SINGLE_SELECTION
             selectedIndex = 0
             cellRenderer =
-                com.intellij.ui.SimpleListCellRenderer.create<ImportableAccount>("") { account ->
-                    "${account.login} — ${account.serverUrl}"
-                }
+                textListCellRenderer<ImportableAccount> { "${it.login} — ${it.serverUrl}" }
         }
 
     val chosen: ImportableAccount? get() = list.selectedValue
