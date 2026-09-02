@@ -52,10 +52,11 @@ intellijPlatform {
     }
 
     pluginVerification {
-        failureLevel = listOf(
-            VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
-            VerifyPluginTask.FailureLevel.INVALID_PLUGIN,
-        )
+        failureLevel =
+            listOf(
+                VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
+                VerifyPluginTask.FailureLevel.INVALID_PLUGIN,
+            )
     }
 }
 
