@@ -9,6 +9,7 @@ import com.github.vhrabar.issuehub.model.optionsFrom
 import com.github.vhrabar.issuehub.provider.AuthenticationRequiredException
 import com.github.vhrabar.issuehub.provider.IssueProvider
 import com.github.vhrabar.issuehub.settings.IssueHubConfigurable
+import com.github.vhrabar.issuehub.settings.IssueHubRepositoryConfigurable
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.options.ShowSettingsUtil
@@ -21,6 +22,7 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
 import com.intellij.util.ui.JBUI
 import kotlinx.coroutines.runBlocking
@@ -49,16 +51,10 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         val panel = IssueHubToolWindowPanel(project)
         toolWindow.component.putClientProperty(ToolWindowContentUi.HIDE_ID_LABEL, "true")
 
-        val source = IssueProvider.firstApplicable(project)?.sourceLabel(project)
-        val content =
-            ContentFactory.getInstance().createContent(
-                panel,
-                source?.substringAfterLast('/') ?: IssueHubBundle["toolWindow.title"],
-                false,
-            )
-        content.description = source
+        val content = ContentFactory.getInstance().createContent(panel, IssueHubBundle["toolWindow.title"], false)
         content.setDisposer(panel)
         toolWindow.contentManager.addContent(content)
+        panel.content = content
     }
 
     override fun shouldBeAvailable(project: Project) = true
@@ -98,11 +94,9 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         // CENTER swaps between a status message and the issue list.
         private val statusLabel = JBLabel(IssueHubBundle["toolWindow.placeholder"])
 
-        // Only shown when the fix is an account, so the way there is one click from the message.
-        private val accountsLink =
-            ActionLink(IssueHubBundle["toolWindow.auth.openSettings"]) { openAccountSettings() }.apply {
-                isVisible = false
-            }
+        // Shown when the fix is on a settings page, so the way there is one click from the message.
+        private var statusLinkAction: () -> Unit = {}
+        private val statusLink = ActionLink("") { statusLinkAction() }.apply { isVisible = false }
         private val cardLayout = CardLayout()
         private val center =
             JBPanel<JBPanel<*>>(cardLayout).apply {
@@ -112,7 +106,7 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                         add(
                             JBPanel<JBPanel<*>>(BorderLayout(0, JBUI.scale(6))).apply {
                                 add(statusLabel, BorderLayout.NORTH)
-                                add(accountsLink, BorderLayout.WEST)
+                                add(statusLink, BorderLayout.WEST)
                             },
                             BorderLayout.NORTH,
                         )
@@ -127,6 +121,13 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                     },
                     LIST_CARD,
                 )
+            }
+
+        /** The tab this panel sits in. Its title follows the repository, which a settings page can change. */
+        var content: Content? = null
+            set(value) {
+                field = value
+                showSource(IssueProvider.firstApplicable(project))
             }
 
         /** Values the provider enumerated, and values merely seen on issues we've already loaded. */
@@ -186,12 +187,23 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             refresh(reloadOptions = true)
         }
 
+        /** Reloads on the way back, since naming a repository is what makes a provider apply. */
+        private fun openRepositorySettings() {
+            ShowSettingsUtil.getInstance().showSettingsDialog(project, IssueHubRepositoryConfigurable::class.java)
+            refresh(reloadOptions = true)
+        }
+
+        /** [link] is the text and target of a settings page that would fix what [text] describes. */
         private fun showStatus(
             text: String,
-            offerAccounts: Boolean = false,
+            link: Pair<String, () -> Unit>? = null,
         ) {
             statusLabel.text = text
-            accountsLink.isVisible = offerAccounts
+            statusLink.isVisible = link != null
+            link?.let { (label, action) ->
+                statusLink.text = label
+                statusLinkAction = action
+            }
             cardLayout.show(center, STATUS_CARD)
         }
 
@@ -209,7 +221,10 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                     AuthenticationRequiredException.Reason.REJECTED -> "toolWindow.auth.rejected"
                 }
             listModel.clear()
-            showStatus(IssueHubBundle[key, provider.displayName], offerAccounts = true)
+            showStatus(
+                IssueHubBundle[key, provider.displayName],
+                IssueHubBundle["toolWindow.auth.openSettings"] to ::openAccountSettings,
+            )
         }
 
         private fun showIssues(
@@ -225,14 +240,26 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             cardLayout.show(center, LIST_CARD)
         }
 
+        /** Names the tab after the repository, with the full `owner/name` as its tooltip. */
+        private fun showSource(provider: IssueProvider?) {
+            val tab = content ?: return
+            val source = provider?.sourceLabel(project)
+            tab.displayName = source?.substringAfterLast('/') ?: IssueHubBundle["toolWindow.title"]
+            tab.description = source
+        }
+
         /**
          * [reloadOptions] re-reads the label/assignee/milestone lists too; they barely ever change,
          * so filter and search changes skip that round trip and only re-run the query.
          */
         private fun refresh(reloadOptions: Boolean) {
             val provider = IssueProvider.firstApplicable(project)
+            showSource(provider)
             if (provider == null) {
-                showStatus(IssueHubBundle["toolWindow.noProvider"])
+                showStatus(
+                    IssueHubBundle["toolWindow.noProvider"],
+                    IssueHubBundle["toolWindow.repository.open"] to ::openRepositorySettings,
+                )
                 return
             }
             val query = filterBar.query

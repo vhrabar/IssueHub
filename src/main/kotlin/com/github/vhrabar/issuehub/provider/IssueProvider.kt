@@ -1,5 +1,6 @@
 package com.github.vhrabar.issuehub.provider
 
+import com.github.vhrabar.issuehub.IssueHubBundle
 import com.github.vhrabar.issuehub.model.Issue
 import com.github.vhrabar.issuehub.model.IssueDetail
 import com.github.vhrabar.issuehub.model.IssueFilterOptions
@@ -49,6 +50,12 @@ interface IssueProvider {
      * a token. Empty when there are none, or when the IDE has no such notion for this provider.
      */
     suspend fun importableAccounts(): List<ImportableAccount> = emptyList()
+
+    /**
+     * Whether this provider can serve [repository], typed by the user in place of the one detected
+     * for a project. Null when it can, otherwise what is wrong with it, worded for the settings page.
+     */
+    fun checkRepository(repository: String): String? = IssueHubBundle["settings.repository.unsupported", displayName]
 
     /** HR desc of src, or null */
     fun sourceLabel(project: Project): String?

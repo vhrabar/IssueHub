@@ -7,6 +7,7 @@
 ### Added
 
 - GitHub Enterprise repositories are detected from the project's git remote, as long as an account is set up for that server. SSH, HTTPS and `ssh://` remotes with a port are all recognised.
+- **Settings | Tools | IssueHub | Repository** names the repository a project reads issues from, for when the git remote points elsewhere, such as a fork whose issues live upstream. It takes `owner/name`, `host/owner/name` for an Enterprise server, or a pasted repository URL, and is kept per project without being shared through version control. When no repository is detected, the tool window links straight to it.
 
 ### Changed
 

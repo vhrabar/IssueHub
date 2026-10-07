@@ -23,6 +23,7 @@ import com.github.vhrabar.issuehub.provider.ImportableAccount
 import com.github.vhrabar.issuehub.provider.IssueProvider
 import com.github.vhrabar.issuehub.settings.IssueHubAccount
 import com.github.vhrabar.issuehub.settings.IssueHubAccounts
+import com.github.vhrabar.issuehub.settings.IssueHubProjectSettings
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import java.net.URI
@@ -357,17 +358,44 @@ class GitHubIssueProvider : IssueProvider {
         )
     }
 
-    /** The project's repository, on github.com or on any Enterprise host the user has an account for. */
-    private fun detect(project: Project): RepoCoordinates? =
-        RepoDetector.detect(
-            project,
-            knownHosts =
-                IssueHubAccounts
-                    .getInstance()
-                    .accountsFor(identifier)
-                    .mapNotNull { webHost(it.serverUrl) }
-                    .toSet(),
-        )
+    /**
+     * Accepts `owner/name`, `HOST/owner/name` or a repository URL, on github.com or on an Enterprise
+     * host there is an account for: without one there is no telling which API root the host serves.
+     */
+    override fun checkRepository(repository: String): String? {
+        val hosts = knownHosts()
+        if (RepoDetector.parseRepository(repository, hosts) != null) return null
+        val host = RepoDetector.hostOf(repository)
+        return if (host != null && host != RepoDetector.GITHUB_HOST && host !in hosts) {
+            IssueHubBundle["settings.repository.github.unknownHost", host]
+        } else {
+            IssueHubBundle["settings.repository.github.invalid"]
+        }
+    }
+
+    /**
+     * The project's repository: the one the user named for it, otherwise the one its git remote
+     * points at, on github.com or on any Enterprise host the user has an account for.
+     *
+     * A named repository that no longer parses (its Enterprise account was removed since) falls back
+     * to detection rather than leaving the project with no issues at all.
+     */
+    private fun detect(project: Project): RepoCoordinates? {
+        val hosts = knownHosts()
+        val override = IssueHubProjectSettings.getInstance(project).repositoryOverride
+        val named = override?.let { RepoDetector.parseRepository(it, hosts) }
+        if (override != null && named == null) {
+            thisLogger().info("Ignoring repository override '$override'; falling back to the git remote")
+        }
+        return named ?: RepoDetector.detect(project, hosts)
+    }
+
+    private fun knownHosts(): Set<String> =
+        IssueHubAccounts
+            .getInstance()
+            .accountsFor(identifier)
+            .mapNotNull { webHost(it.serverUrl) }
+            .toSet()
 
     /**
      * The client and token to work through for [repo]: the account on the repository's own server,

@@ -39,6 +39,44 @@ object RepoDetector {
     }
 
     /**
+     * A repository the user typed rather than one read off a remote: anything [parseGitHubUrl]
+     * takes, plus the shorthand `owner/name` for github.com and `HOST/owner/name` for an Enterprise
+     * host in [knownHosts].
+     */
+    fun parseRepository(
+        value: String,
+        knownHosts: Set<String> = emptySet(),
+    ): RepoCoordinates? {
+        val trimmed = value.trim().trimEnd('/').removeSuffix(".git")
+        if ("://" in trimmed || ':' in trimmed) return parseGitHubUrl(trimmed, knownHosts)
+
+        val parts = trimmed.split('/')
+        if (parts.any { it.isBlank() }) return null
+        return when (parts.size) {
+            2 -> RepoCoordinates(parts[0], parts[1])
+            3 -> parseGitHubUrl("https://$trimmed", knownHosts)
+            else -> null
+        }
+    }
+
+    /** The host [value] names, if it names one; lets a caller say which host lacks an account. */
+    fun hostOf(value: String): String? {
+        val trimmed = value.trim()
+        val authority =
+            when {
+                "://" in trimmed -> trimmed.substringAfter("://").substringBefore('/')
+                ':' in trimmed -> trimmed.substringBefore(':')
+                trimmed.count { it == '/' } >= 2 -> trimmed.substringBefore('/')
+                else -> return null
+            }
+        return authority
+            .substringAfterLast('@')
+            .substringBefore(':')
+            .lowercase()
+            .ifEmpty { null }
+    }
+
+    /**
      * Handles the scp-like `git@HOST:owner/name.git` as well as `https://HOST/owner/name(.git)` and
      * `ssh://git@HOST:PORT/owner/name.git`. The host has to match exactly, so a look-alike such as
      * `github.com.example.org` isn't taken for GitHub.
