@@ -1,3 +1,5 @@
+import org.jetbrains.changelog.Changelog
+import org.jetbrains.changelog.ChangelogSectionUrlBuilder
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
@@ -23,6 +25,46 @@ dependencies {
     }
 }
 
+changelog {
+    version.set(providers.gradleProperty("version"))
+    path.set(
+        layout.projectDirectory
+            .file("CHANGELOG.md")
+            .asFile.canonicalPath,
+    )
+    repositoryUrl.set(providers.gradleProperty("pluginRepositoryUrl"))
+    groups.set(emptyList())
+    sectionUrlBuilder.set(
+        ChangelogSectionUrlBuilder { repositoryUrl, currentVersion, previousVersion, isUnreleased ->
+            fun tag(version: String) = if (version == "0.0.2") "v$version" else version
+            when {
+                isUnreleased && previousVersion != null -> "$repositoryUrl/compare/${tag(previousVersion)}...HEAD"
+                isUnreleased -> "$repositoryUrl/commits"
+                previousVersion == null -> "$repositoryUrl/commits/${tag(currentVersion!!)}"
+                else -> "$repositoryUrl/compare/${tag(previousVersion)}...${tag(currentVersion!!)}"
+            }
+        },
+    )
+}
+
+val changelogFile = layout.projectDirectory.file("CHANGELOG.md")
+if (providers
+        .fileContents(changelogFile)
+        .asText.orNull
+        .isNullOrBlank()
+) {
+    throw GradleException("CHANGELOG.md is missing or empty; plugin change notes cannot be rendered.")
+}
+val renderedChangeNotes =
+    with(project.changelog) {
+        renderItem(
+            (getOrNull(providers.gradleProperty("version").get()) ?: getUnreleased())
+                .withHeader(false)
+                .withEmptySections(false),
+            Changelog.OutputType.HTML,
+        )
+    }
+
 intellijPlatform {
     pluginConfiguration {
         // Marketplace description is sourced from README.md between the marker comments
@@ -38,17 +80,8 @@ intellijPlatform {
                 }
             }
 
-        changeNotes =
-            provider {
-                with(changelog) {
-                    renderItem(
-                        (getOrNull(project.version.toString()) ?: getUnreleased())
-                            .withHeader(false)
-                            .withEmptySections(false),
-                        org.jetbrains.changelog.Changelog.OutputType.HTML,
-                    )
-                }
-            }
+        // "What's New" shown to users on install and on every update
+        changeNotes.set(renderedChangeNotes)
     }
 }
 
