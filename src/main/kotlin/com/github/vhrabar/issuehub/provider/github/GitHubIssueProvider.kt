@@ -21,9 +21,11 @@ import com.github.vhrabar.issuehub.provider.AuthenticationRequiredException
 import com.github.vhrabar.issuehub.provider.IdeAccountImporter
 import com.github.vhrabar.issuehub.provider.ImportableAccount
 import com.github.vhrabar.issuehub.provider.IssueProvider
+import com.github.vhrabar.issuehub.settings.IssueHubAccount
 import com.github.vhrabar.issuehub.settings.IssueHubAccounts
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
+import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.collections.map
 
@@ -244,9 +246,9 @@ class GitHubIssueProvider : IssueProvider {
     override val displayName = "GitHub"
     override val defaultServerUrl = DEFAULT_SERVER_URL
 
-    override fun isApplicable(project: Project): Boolean = RepoDetector.detect(project) != null
+    override fun isApplicable(project: Project): Boolean = detect(project) != null
 
-    override fun sourceLabel(project: Project): String? = RepoDetector.detect(project)?.toString()
+    override fun sourceLabel(project: Project): String? = detect(project)?.toString()
 
     /**
      * Confirms a token by asking who it belongs to, and reads what it may do off the response.
@@ -295,8 +297,8 @@ class GitHubIssueProvider : IssueProvider {
         project: Project,
         query: IssueQuery,
     ): List<Issue> {
-        val repo = RepoDetector.detect(project) ?: return emptyList()
-        val (client, token) = session()
+        val repo = detect(project) ?: return emptyList()
+        val (client, token) = session(repo)
         return try {
             client.fetchIssues(repo, token, query).map { it.toIssue() }
         } catch (e: GitHubApiException) {
@@ -317,8 +319,8 @@ class GitHubIssueProvider : IssueProvider {
         project: Project,
         issue: Issue,
     ): IssueDetail? {
-        val repo = RepoDetector.detect(project) ?: return null
-        val (client, token) = session()
+        val repo = detect(project) ?: return null
+        val (client, token) = session(repo)
         val dto = client.fetchIssue(repo, token, issue.id)
         val timeline =
             runCatching { client.fetchTimeline(repo, token, issue.id) }
@@ -339,8 +341,8 @@ class GitHubIssueProvider : IssueProvider {
      * read-only tokens, and losing the assignee dropdown shouldn't cost us labels too.
      */
     override suspend fun fetchFilterOptions(project: Project): IssueFilterOptions {
-        val repo = RepoDetector.detect(project) ?: return IssueFilterOptions()
-        val (client, token) = session()
+        val repo = detect(project) ?: return IssueFilterOptions()
+        val (client, token) = session(repo)
         val assignees = runCatching { client.fetchAssignableUsers(repo, token).map { it.login } }.getOrDefault(emptyList())
         return IssueFilterOptions(
             labels =
@@ -355,16 +357,31 @@ class GitHubIssueProvider : IssueProvider {
         )
     }
 
+    /** The project's repository, on github.com or on any Enterprise host the user has an account for. */
+    private fun detect(project: Project): RepoCoordinates? =
+        RepoDetector.detect(
+            project,
+            knownHosts =
+                IssueHubAccounts
+                    .getInstance()
+                    .accountsFor(identifier)
+                    .mapNotNull { webHost(it.serverUrl) }
+                    .toSet(),
+        )
+
     /**
-     * The client and token to work through: whichever account is configured for GitHub, or an
-     * unauthenticated client against github.com when there is none.
+     * The client and token to work through for [repo]: the account on the repository's own server,
+     * or an unauthenticated client against github.com when there is none.
      *
      * Public repositories answer without a token, at a much lower rate limit, which is why the
-     * absence of an account isn't an error here.
+     * absence of an account isn't an error here. An Enterprise repository always has an account,
+     * since that account is the only reason its remote was recognised.
      */
-    private fun session(): Pair<GitHubClient, String?> {
+    private fun session(repo: RepoCoordinates): Pair<GitHubClient, String?> {
         val accounts = IssueHubAccounts.getInstance()
-        val account = accounts.defaultAccountFor(identifier) ?: accounts.adoptLegacyToken(identifier, defaultServerUrl)
+        val account =
+            accountFor(repo, accounts.accountsFor(identifier))
+                ?: if (repo.host == RepoDetector.GITHUB_HOST) accounts.adoptLegacyToken(identifier, defaultServerUrl) else null
         return client(account?.serverUrl ?: defaultServerUrl) to account?.let { accounts.token(it) }
     }
 
@@ -377,6 +394,18 @@ class GitHubIssueProvider : IssueProvider {
 
         /** Either spelling lets a token read project boards; `read:project` is the one to ask for. */
         private val PROJECT_SCOPES = listOf("read:project", "project")
+
+        /**
+         * The account that lives on [repo]'s server. Matching by host keeps a github.com token from
+         * being sent to an Enterprise install, and the other way round.
+         */
+        internal fun accountFor(
+            repo: RepoCoordinates,
+            accounts: List<IssueHubAccount>,
+        ): IssueHubAccount? = accounts.firstOrNull { webHost(it.serverUrl) == repo.host }
+
+        /** The host a remote URL would name for [serverUrl]: `github.com` for `api.github.com`. */
+        internal fun webHost(serverUrl: String): String? = runCatching { URI(webUrl(serverUrl)).host?.lowercase() }.getOrNull()
 
         /**
          * The site behind an API root: `api.github.com` is served from `github.com`, and an

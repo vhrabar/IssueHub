@@ -4,7 +4,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- GitHub Enterprise repositories are detected from the project's git remote, as long as an account is set up for that server. SSH, HTTPS and `ssh://` remotes with a port are all recognised.
+
 ### Changed
+
+- Each repository is read with the account on its own server, so a github.com project and an Enterprise one use their own tokens. Before, every project used whichever GitHub account was added first.
 
 - When GitHub won't serve the issue list without an account, the tool window says so and links straight to the accounts 
    page instead of showing a raw error. A private repository opened with no account set up asks for one, and a saved token that

@@ -28,8 +28,8 @@ class AccountsState : BaseState() {
  * Every account IssueHub knows about, for all providers.
  *
  * Application-level, like the IDE's own VCS accounts: a token belongs to a user and a server, not
- * to whatever project happens to be open. Choosing which account a project uses is a separate
- * problem; for now it's always the first one registered for the provider.
+ * to whatever project happens to be open. Which account a project uses is up to the provider; GitHub
+ * picks the one on the server the repository's remote points at.
  *
  * Nothing in here is GitHub specific. Providers pass their own id and server URL, so adding GitLab
  * or Jira needs no changes to this class.
@@ -41,9 +41,6 @@ class IssueHubAccounts : SimplePersistentStateComponent<AccountsState>(AccountsS
         get() = state.accounts.mapNotNull { it.toAccount() }
 
     fun accountsFor(providerId: String): List<IssueHubAccount> = accounts.filter { it.providerId == providerId }
-
-    /** The account a provider should use. Per-project selection isn't implemented yet. */
-    fun defaultAccountFor(providerId: String): IssueHubAccount? = accountsFor(providerId).firstOrNull()
 
     fun token(account: IssueHubAccount): String? = IssueHubSecrets.getToken(account.id)
 
