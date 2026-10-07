@@ -28,13 +28,18 @@ object RepoDetector {
 
     /** Handles both `git@github.com:owner/name.git` and `https://github.com/owner/name(.git)`. */
     fun parseGitHubUrl(url: String): RepoCoordinates? {
-        val normalized =
-            url
-                .removeSuffix(".git")
-                .substringAfter("github.com")
-                .trim(':', '/')
-        val parts = normalized.split('/')
+        val withoutGit = url.trim().removeSuffix(".git")
+
+        val hostIndex = withoutGit.indexOf(GITHUB_HOST)
+        if (hostIndex < 0) return null
+
+        val afterHost = withoutGit.substring(hostIndex + GITHUB_HOST.length)
+        if (afterHost.isEmpty() || (afterHost[0] != ':' && afterHost[0] != '/')) return null
+
+        val parts = afterHost.trim(':', '/').split('/')
         if (parts.size < 2 || parts[0].isBlank() || parts[1].isBlank()) return null
         return RepoCoordinates(parts[0], parts[1])
     }
+
+    private const val GITHUB_HOST = "github.com"
 }
