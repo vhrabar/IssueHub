@@ -128,6 +128,7 @@ class GitHubClientTest {
             fail("Expected GitHubApiException for status $status")
         } catch (e: GitHubApiException) {
             assertTrue(e.message, e.message?.contains(expectedFragment) == true)
+            assertEquals(status, e.status)
         } finally {
             responseStatus = 200
             responseBody = "[]"

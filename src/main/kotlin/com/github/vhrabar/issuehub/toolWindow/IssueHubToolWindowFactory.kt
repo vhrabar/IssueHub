@@ -6,6 +6,7 @@ import com.github.vhrabar.issuehub.model.Issue
 import com.github.vhrabar.issuehub.model.IssueFilterOptions
 import com.github.vhrabar.issuehub.model.IssueQuery
 import com.github.vhrabar.issuehub.model.optionsFrom
+import com.github.vhrabar.issuehub.provider.AuthenticationRequiredException
 import com.github.vhrabar.issuehub.provider.IssueProvider
 import com.github.vhrabar.issuehub.settings.IssueHubConfigurable
 import com.intellij.openapi.Disposable
@@ -15,6 +16,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.openapi.wm.impl.content.ToolWindowContentUi
+import com.intellij.ui.components.ActionLink
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBPanel
@@ -95,13 +97,25 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
 
         // CENTER swaps between a status message and the issue list.
         private val statusLabel = JBLabel(IssueHubBundle["toolWindow.placeholder"])
+
+        // Only shown when the fix is an account, so the way there is one click from the message.
+        private val accountsLink =
+            ActionLink(IssueHubBundle["toolWindow.auth.openSettings"]) { openAccountSettings() }.apply {
+                isVisible = false
+            }
         private val cardLayout = CardLayout()
         private val center =
             JBPanel<JBPanel<*>>(cardLayout).apply {
                 add(
                     JBPanel<JBPanel<*>>(BorderLayout()).apply {
                         border = JBUI.Borders.empty(10)
-                        add(statusLabel, BorderLayout.NORTH)
+                        add(
+                            JBPanel<JBPanel<*>>(BorderLayout(0, JBUI.scale(6))).apply {
+                                add(statusLabel, BorderLayout.NORTH)
+                                add(accountsLink, BorderLayout.WEST)
+                            },
+                            BorderLayout.NORTH,
+                        )
                     },
                     STATUS_CARD,
                 )
@@ -160,19 +174,42 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             )
             actions.add(
                 JButton(IssueHubBundle["toolWindow.settings"]).apply {
-                    // Reloads on the way back: the accounts page is where a token is added or dropped.
-                    addActionListener {
-                        ShowSettingsUtil.getInstance().showSettingsDialog(project, IssueHubConfigurable::class.java)
-                        refresh(reloadOptions = true)
-                    }
+                    addActionListener { openAccountSettings() }
                 },
             )
             return actions
         }
 
-        private fun showStatus(text: String) {
+        /** Reloads on the way back: the accounts page is where a token is added or dropped. */
+        private fun openAccountSettings() {
+            ShowSettingsUtil.getInstance().showSettingsDialog(project, IssueHubConfigurable::class.java)
+            refresh(reloadOptions = true)
+        }
+
+        private fun showStatus(
+            text: String,
+            offerAccounts: Boolean = false,
+        ) {
             statusLabel.text = text
+            accountsLink.isVisible = offerAccounts
             cardLayout.show(center, STATUS_CARD)
+        }
+
+        private fun showFailure(
+            provider: IssueProvider,
+            error: Throwable,
+        ) {
+            if (error !is AuthenticationRequiredException) {
+                showStatus(IssueHubBundle["toolWindow.error", error.message ?: error.toString()])
+                return
+            }
+            val key =
+                when (error.reason) {
+                    AuthenticationRequiredException.Reason.MISSING -> "toolWindow.auth.missing"
+                    AuthenticationRequiredException.Reason.REJECTED -> "toolWindow.auth.rejected"
+                }
+            listModel.clear()
+            showStatus(IssueHubBundle[key, provider.displayName], offerAccounts = true)
         }
 
         private fun showIssues(
@@ -218,7 +255,7 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                             discoveredOptions = discoveredOptions.mergedWith(optionsFrom(issues))
                             filterBar.setOptions(providerOptions.mergedWith(discoveredOptions))
                             showIssues(issues, query)
-                        }.onFailure { showStatus(IssueHubBundle["toolWindow.error", it.message ?: it.toString()]) }
+                        }.onFailure { showFailure(provider, it) }
                 }
             }
         }

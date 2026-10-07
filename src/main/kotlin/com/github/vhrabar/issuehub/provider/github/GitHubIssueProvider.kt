@@ -17,6 +17,7 @@ import com.github.vhrabar.issuehub.model.IssueState
 import com.github.vhrabar.issuehub.model.IssueTimelineItem
 import com.github.vhrabar.issuehub.model.PullRequestState
 import com.github.vhrabar.issuehub.provider.AccountVerification
+import com.github.vhrabar.issuehub.provider.AuthenticationRequiredException
 import com.github.vhrabar.issuehub.provider.IdeAccountImporter
 import com.github.vhrabar.issuehub.provider.ImportableAccount
 import com.github.vhrabar.issuehub.provider.IssueProvider
@@ -207,6 +208,30 @@ internal fun commitWebUrl(apiUrl: String): String? {
     return "$host/${path.replaceFirst(API_COMMITS_PATH, WEB_COMMIT_PATH)}"
 }
 
+/**
+ * Whether [this] failure is one an account would fix, and which kind.
+ *
+ * With a token, only 401 means the token itself is bad; 403 and 404 can be a token that is fine but
+ * lacks access, which the regular error already explains. Without one, GitHub hides private
+ * repositories behind 404 and rate-limits anonymous callers with 403, so all three ask for an account.
+ */
+internal fun GitHubApiException.asAuthenticationFailure(hasToken: Boolean): AuthenticationRequiredException? =
+    when {
+        hasToken && status == 401 -> {
+            AuthenticationRequiredException(AuthenticationRequiredException.Reason.REJECTED, message.orEmpty(), this)
+        }
+
+        !hasToken && status in ANONYMOUS_REFUSALS -> {
+            AuthenticationRequiredException(AuthenticationRequiredException.Reason.MISSING, message.orEmpty(), this)
+        }
+
+        else -> {
+            null
+        }
+    }
+
+private val ANONYMOUS_REFUSALS = setOf(401, 403, 404)
+
 private const val API_REPOS_PATH = "/repos/"
 private const val API_COMMITS_PATH = "/commits/"
 private const val WEB_COMMIT_PATH = "/commit/"
@@ -272,7 +297,11 @@ class GitHubIssueProvider : IssueProvider {
     ): List<Issue> {
         val repo = RepoDetector.detect(project) ?: return emptyList()
         val (client, token) = session()
-        return client.fetchIssues(repo, token, query).map { it.toIssue() }
+        return try {
+            client.fetchIssues(repo, token, query).map { it.toIssue() }
+        } catch (e: GitHubApiException) {
+            throw e.asAuthenticationFailure(hasToken = !token.isNullOrBlank()) ?: e
+        }
     }
 
     /**

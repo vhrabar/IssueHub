@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- When GitHub won't serve the issue list without an account, the tool window says so and links straight to the accounts 
+   page instead of showing a raw error. A private repository opened with no account set up asks for one, and a saved token that
+   GitHub now refuses, expired or revoked, is called out as such. The list reloads when you come back from the accounts page.
+
 ## [0.1.1] - 2026-09-02
 
 ### Added
