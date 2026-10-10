@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-10
+
 ### Added
 
 - GitHub Enterprise repositories are detected from the project's git remote, as long as an account is set up for that server. SSH, HTTPS and `ssh://` remotes with a port are all recognised.
@@ -117,7 +119,8 @@
 
 - Verified against IntelliJ Platform 2025.2 through 2026.2
 
-[Unreleased]: https://github.com/vhrabar/IssueHub/compare/0.1.1...HEAD
+[Unreleased]: https://github.com/vhrabar/IssueHub/compare/0.2.0...HEAD
+[0.2.0]: https://github.com/vhrabar/IssueHub/compare/0.1.1...0.2.0
 [0.1.1]: https://github.com/vhrabar/IssueHub/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/vhrabar/IssueHub/compare/0.0.4...0.1.0
 [0.0.4]: https://github.com/vhrabar/IssueHub/compare/0.0.3...0.0.4
