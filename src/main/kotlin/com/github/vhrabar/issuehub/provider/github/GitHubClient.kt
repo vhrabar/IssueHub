@@ -26,6 +26,8 @@ import kotlin.collections.filterNot
 
 class GitHubApiException(
     message: String,
+    /** The HTTP status GitHub answered with; null when the request never got that far. */
+    val status: Int? = null,
 ) : Exception(message)
 
 /** The account behind a token, as `/user` and its headers describe it. */
@@ -323,7 +325,7 @@ internal class GitHubClient(
             val response = http.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString())
             if (response.statusCode() !in 200..299) {
                 thisLogger().warn("GET:GitHub API returned ${response.statusCode()} for ${uri.path}")
-                throw GitHubApiException(describeError(response.statusCode()))
+                throw GitHubApiException(describeError(response.statusCode()), response.statusCode())
             }
 
             response
@@ -351,7 +353,7 @@ internal class GitHubClient(
             val response = http.send(request, HttpResponse.BodyHandlers.ofString())
             if (response.statusCode() !in 200..299) {
                 thisLogger().warn("POST:GitHub API returned ${response.statusCode()} for ${uri.path}")
-                throw GitHubApiException(describeError(response.statusCode()))
+                throw GitHubApiException(describeError(response.statusCode()), response.statusCode())
             }
 
             decode(response.body())

@@ -22,7 +22,6 @@ class IssueHubAccountsTest : BasePlatformTestCase() {
 
         assertEquals(listOf(account), accounts.accountsFor("github"))
         assertEquals("t0ken", accounts.token(account))
-        assertEquals(account, accounts.defaultAccountFor("github"))
     }
 
     /** Two accounts on two servers is the case account-per-provider storage couldn't hold. */
@@ -32,9 +31,8 @@ class IssueHubAccountsTest : BasePlatformTestCase() {
 
         assertEquals("hosted", accounts.token(hosted))
         assertEquals("enterprise", accounts.token(enterprise))
-        assertEquals(2, accounts.accountsFor("github").size)
-        // Providers work through the first until there is a way to choose per project.
-        assertEquals(hosted, accounts.defaultAccountFor("github"))
+        // Both stay listed; the provider picks between them by the repository's server.
+        assertEquals(listOf(hosted, enterprise), accounts.accountsFor("github"))
     }
 
     fun testRemovingAnAccountTakesItsTokenWithIt() {
@@ -51,7 +49,7 @@ class IssueHubAccountsTest : BasePlatformTestCase() {
 
         accounts.update(account.copy(login = "octocat"))
 
-        assertEquals("octocat", accounts.defaultAccountFor("github")?.login)
+        assertEquals("octocat", accounts.accountsFor("github").single().login)
         assertEquals("t0ken", accounts.token(account))
     }
 

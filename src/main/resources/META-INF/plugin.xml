@@ -40,6 +40,13 @@
             id="com.github.vhrabar.issuehub.settings"
             key="settings.displayName"
             instance="com.github.vhrabar.issuehub.settings.IssueHubConfigurable"/>
+
+        <!-- Per-project: which repository this project reads issues from, when detection gets it wrong. -->
+        <projectConfigurable
+            parentId="com.github.vhrabar.issuehub.settings"
+            id="com.github.vhrabar.issuehub.settings.repository"
+            key="settings.repository.displayName"
+            instance="com.github.vhrabar.issuehub.settings.IssueHubRepositoryConfigurable"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.github.vhrabar.issuehub">

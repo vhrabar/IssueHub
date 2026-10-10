@@ -17,12 +17,16 @@ import com.github.vhrabar.issuehub.model.IssueState
 import com.github.vhrabar.issuehub.model.IssueTimelineItem
 import com.github.vhrabar.issuehub.model.PullRequestState
 import com.github.vhrabar.issuehub.provider.AccountVerification
+import com.github.vhrabar.issuehub.provider.AuthenticationRequiredException
 import com.github.vhrabar.issuehub.provider.IdeAccountImporter
 import com.github.vhrabar.issuehub.provider.ImportableAccount
 import com.github.vhrabar.issuehub.provider.IssueProvider
+import com.github.vhrabar.issuehub.settings.IssueHubAccount
 import com.github.vhrabar.issuehub.settings.IssueHubAccounts
+import com.github.vhrabar.issuehub.settings.IssueHubProjectSettings
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
+import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.collections.map
 
@@ -207,6 +211,30 @@ internal fun commitWebUrl(apiUrl: String): String? {
     return "$host/${path.replaceFirst(API_COMMITS_PATH, WEB_COMMIT_PATH)}"
 }
 
+/**
+ * Whether [this] failure is one an account would fix, and which kind.
+ *
+ * With a token, only 401 means the token itself is bad; 403 and 404 can be a token that is fine but
+ * lacks access, which the regular error already explains. Without one, GitHub hides private
+ * repositories behind 404 and rate-limits anonymous callers with 403, so all three ask for an account.
+ */
+internal fun GitHubApiException.asAuthenticationFailure(hasToken: Boolean): AuthenticationRequiredException? =
+    when {
+        hasToken && status == 401 -> {
+            AuthenticationRequiredException(AuthenticationRequiredException.Reason.REJECTED, message.orEmpty(), this)
+        }
+
+        !hasToken && status in ANONYMOUS_REFUSALS -> {
+            AuthenticationRequiredException(AuthenticationRequiredException.Reason.MISSING, message.orEmpty(), this)
+        }
+
+        else -> {
+            null
+        }
+    }
+
+private val ANONYMOUS_REFUSALS = setOf(401, 403, 404)
+
 private const val API_REPOS_PATH = "/repos/"
 private const val API_COMMITS_PATH = "/commits/"
 private const val WEB_COMMIT_PATH = "/commit/"
@@ -219,9 +247,9 @@ class GitHubIssueProvider : IssueProvider {
     override val displayName = "GitHub"
     override val defaultServerUrl = DEFAULT_SERVER_URL
 
-    override fun isApplicable(project: Project): Boolean = RepoDetector.detect(project) != null
+    override fun isApplicable(project: Project): Boolean = detect(project) != null
 
-    override fun sourceLabel(project: Project): String? = RepoDetector.detect(project)?.toString()
+    override fun sourceLabel(project: Project): String? = detect(project)?.toString()
 
     /**
      * Confirms a token by asking who it belongs to, and reads what it may do off the response.
@@ -270,9 +298,13 @@ class GitHubIssueProvider : IssueProvider {
         project: Project,
         query: IssueQuery,
     ): List<Issue> {
-        val repo = RepoDetector.detect(project) ?: return emptyList()
-        val (client, token) = session()
-        return client.fetchIssues(repo, token, query).map { it.toIssue() }
+        val repo = detect(project) ?: return emptyList()
+        val (client, token) = session(repo)
+        return try {
+            client.fetchIssues(repo, token, query).map { it.toIssue() }
+        } catch (e: GitHubApiException) {
+            throw e.asAuthenticationFailure(hasToken = !token.isNullOrBlank()) ?: e
+        }
     }
 
     /**
@@ -288,8 +320,8 @@ class GitHubIssueProvider : IssueProvider {
         project: Project,
         issue: Issue,
     ): IssueDetail? {
-        val repo = RepoDetector.detect(project) ?: return null
-        val (client, token) = session()
+        val repo = detect(project) ?: return null
+        val (client, token) = session(repo)
         val dto = client.fetchIssue(repo, token, issue.id)
         val timeline =
             runCatching { client.fetchTimeline(repo, token, issue.id) }
@@ -310,8 +342,8 @@ class GitHubIssueProvider : IssueProvider {
      * read-only tokens, and losing the assignee dropdown shouldn't cost us labels too.
      */
     override suspend fun fetchFilterOptions(project: Project): IssueFilterOptions {
-        val repo = RepoDetector.detect(project) ?: return IssueFilterOptions()
-        val (client, token) = session()
+        val repo = detect(project) ?: return IssueFilterOptions()
+        val (client, token) = session(repo)
         val assignees = runCatching { client.fetchAssignableUsers(repo, token).map { it.login } }.getOrDefault(emptyList())
         return IssueFilterOptions(
             labels =
@@ -327,15 +359,57 @@ class GitHubIssueProvider : IssueProvider {
     }
 
     /**
-     * The client and token to work through: whichever account is configured for GitHub, or an
-     * unauthenticated client against github.com when there is none.
+     * Accepts `owner/name`, `HOST/owner/name` or a repository URL, on github.com or on an Enterprise
+     * host there is an account for: without one there is no telling which API root the host serves.
+     */
+    override fun checkRepository(repository: String): String? {
+        val hosts = knownHosts()
+        if (RepoDetector.parseRepository(repository, hosts) != null) return null
+        val host = RepoDetector.hostOf(repository)
+        return if (host != null && host != RepoDetector.GITHUB_HOST && host !in hosts) {
+            IssueHubBundle["settings.repository.github.unknownHost", host]
+        } else {
+            IssueHubBundle["settings.repository.github.invalid"]
+        }
+    }
+
+    /**
+     * The project's repository: the one the user named for it, otherwise the one its git remote
+     * points at, on github.com or on any Enterprise host the user has an account for.
+     *
+     * A named repository that no longer parses (its Enterprise account was removed since) falls back
+     * to detection rather than leaving the project with no issues at all.
+     */
+    private fun detect(project: Project): RepoCoordinates? {
+        val hosts = knownHosts()
+        val override = IssueHubProjectSettings.getInstance(project).repositoryOverride
+        val named = override?.let { RepoDetector.parseRepository(it, hosts) }
+        if (override != null && named == null) {
+            thisLogger().info("Ignoring repository override '$override'; falling back to the git remote")
+        }
+        return named ?: RepoDetector.detect(project, hosts)
+    }
+
+    private fun knownHosts(): Set<String> =
+        IssueHubAccounts
+            .getInstance()
+            .accountsFor(identifier)
+            .mapNotNull { webHost(it.serverUrl) }
+            .toSet()
+
+    /**
+     * The client and token to work through for [repo]: the account on the repository's own server,
+     * or an unauthenticated client against github.com when there is none.
      *
      * Public repositories answer without a token, at a much lower rate limit, which is why the
-     * absence of an account isn't an error here.
+     * absence of an account isn't an error here. An Enterprise repository always has an account,
+     * since that account is the only reason its remote was recognised.
      */
-    private fun session(): Pair<GitHubClient, String?> {
+    private fun session(repo: RepoCoordinates): Pair<GitHubClient, String?> {
         val accounts = IssueHubAccounts.getInstance()
-        val account = accounts.defaultAccountFor(identifier) ?: accounts.adoptLegacyToken(identifier, defaultServerUrl)
+        val account =
+            accountFor(repo, accounts.accountsFor(identifier))
+                ?: if (repo.host == RepoDetector.GITHUB_HOST) accounts.adoptLegacyToken(identifier, defaultServerUrl) else null
         return client(account?.serverUrl ?: defaultServerUrl) to account?.let { accounts.token(it) }
     }
 
@@ -348,6 +422,18 @@ class GitHubIssueProvider : IssueProvider {
 
         /** Either spelling lets a token read project boards; `read:project` is the one to ask for. */
         private val PROJECT_SCOPES = listOf("read:project", "project")
+
+        /**
+         * The account that lives on [repo]'s server. Matching by host keeps a github.com token from
+         * being sent to an Enterprise install, and the other way round.
+         */
+        internal fun accountFor(
+            repo: RepoCoordinates,
+            accounts: List<IssueHubAccount>,
+        ): IssueHubAccount? = accounts.firstOrNull { webHost(it.serverUrl) == repo.host }
+
+        /** The host a remote URL would name for [serverUrl]: `github.com` for `api.github.com`. */
+        internal fun webHost(serverUrl: String): String? = runCatching { URI(webUrl(serverUrl)).host?.lowercase() }.getOrNull()
 
         /**
          * The site behind an API root: `api.github.com` is served from `github.com`, and an
