@@ -4,6 +4,7 @@ import com.github.vhrabar.issuehub.IssueHubBundle
 import com.github.vhrabar.issuehub.editor.IssueVirtualFile
 import com.github.vhrabar.issuehub.model.Issue
 import com.github.vhrabar.issuehub.model.IssueFilterOptions
+import com.github.vhrabar.issuehub.model.IssuePage
 import com.github.vhrabar.issuehub.model.IssueQuery
 import com.github.vhrabar.issuehub.model.optionsFrom
 import com.github.vhrabar.issuehub.provider.AuthenticationRequiredException
@@ -25,6 +26,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.runBlocking
 import java.awt.BorderLayout
 import java.awt.CardLayout
@@ -97,6 +99,15 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         // Shown when the fix is on a settings page, so the way there is one click from the message.
         private var statusLinkAction: () -> Unit = {}
         private val statusLink = ActionLink("") { statusLinkAction() }.apply { isVisible = false }
+
+        // Under the list: how much of the result is on screen, and the way to the next page.
+        private val pageLabel = JBLabel().apply { foreground = UIUtil.getContextHelpForeground() }
+        private val loadMoreLink = ActionLink(IssueHubBundle["toolWindow.loadMore"]) { loadMore() }
+        private val pageFooter =
+            JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, JBUI.scale(8), JBUI.scale(4))).apply {
+                add(pageLabel)
+                add(loadMoreLink)
+            }
         private val cardLayout = CardLayout()
         private val center =
             JBPanel<JBPanel<*>>(cardLayout).apply {
@@ -115,9 +126,15 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                 )
                 // Rows ellipsize to the viewport width, so a horizontal scrollbar would never be useful.
                 add(
-                    JBScrollPane(issueList).apply {
-                        horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
-                        border = JBUI.Borders.empty()
+                    JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                        add(
+                            JBScrollPane(issueList).apply {
+                                horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
+                                border = JBUI.Borders.empty()
+                            },
+                            BorderLayout.CENTER,
+                        )
+                        add(pageFooter, BorderLayout.SOUTH)
                     },
                     LIST_CARD,
                 )
@@ -136,6 +153,13 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
 
         /** Guards against a slow response for an abandoned query overwriting a newer one. */
         private var requestId = 0
+
+        /** The query on screen and the page after the last one appended; null once there are no more. */
+        private var shownQuery: IssueQuery? = null
+        private var nextPage: Int? = null
+        private var totalCount: Int? = null
+        private var loadingMore = false
+        private var loadMoreError: String? = null
 
         private val filterBar =
             IssueFilterBar(this, buildActions()) { refresh(reloadOptions = false) }
@@ -264,6 +288,7 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             }
             val query = filterBar.query
             val id = ++requestId
+            loadingMore = false
             showStatus(IssueHubBundle["toolWindow.loading"])
             // fetchIssues is a suspend fn doing network IO
             ApplicationManager.getApplication().executeOnPooledThread {
@@ -283,9 +308,79 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                             discoveredOptions = discoveredOptions.mergedWith(optionsFrom(issues))
                             filterBar.setOptions(providerOptions.mergedWith(discoveredOptions))
                             showIssues(issues, query)
+                            rememberPage(query, page)
                         }.onFailure { showFailure(provider, it) }
                 }
             }
+        }
+
+        private fun rememberPage(
+            query: IssueQuery,
+            page: IssuePage,
+        ) {
+            shownQuery = query
+            nextPage = if (page.hasMore) query.page + 1 else null
+            totalCount = page.totalCount
+            loadMoreError = null
+            updatePageFooter()
+        }
+
+        /**
+         * Appends the next page of the query on screen. It shares [requestId] with [refresh] without
+         * advancing it, so a refresh or a filter change started meanwhile wins and this result is dropped.
+         */
+        private fun loadMore() {
+            val query = shownQuery ?: return
+            val page = nextPage ?: return
+            if (loadingMore) return
+            val provider = IssueProvider.firstApplicable(project) ?: return
+            val id = requestId
+            loadingMore = true
+            loadMoreError = null
+            updatePageFooter()
+            val pageQuery = query.copy(page = page)
+            ApplicationManager.getApplication().executeOnPooledThread {
+                val result = runCatching { runBlocking { provider.fetchIssues(project, pageQuery) } }
+                ApplicationManager.getApplication().invokeLater {
+                    if (id != requestId) return@invokeLater
+                    loadingMore = false
+                    result
+                        .onSuccess { next ->
+                            // Issues filed since the first page push older ones down a page, so the
+                            // next page can repeat rows already in the list.
+                            val shown = (0 until listModel.size()).mapTo(HashSet()) { listModel[it].id }
+                            next.issues.filter { it.id !in shown }.forEach(listModel::addElement)
+                            discoveredOptions = discoveredOptions.mergedWith(optionsFrom(next.issues))
+                            filterBar.setOptions(providerOptions.mergedWith(discoveredOptions))
+                            rememberPage(query.copy(page = page), next)
+                        }.onFailure {
+                            // The rows already loaded stay; only the footer says what went wrong.
+                            loadMoreError = it.message ?: it.toString()
+                            updatePageFooter()
+                        }
+                }
+            }
+        }
+
+        private fun updatePageFooter() {
+            val shown = listModel.size()
+            pageLabel.text =
+                when {
+                    loadMoreError != null -> IssueHubBundle["toolWindow.loadMore.error", loadMoreError!!]
+                    totalCount != null -> IssueHubBundle["toolWindow.page.countOfTotal", shown, totalCount!!]
+                    else -> IssueHubBundle["toolWindow.page.count", shown]
+                }
+            loadMoreLink.text =
+                IssueHubBundle[
+                    when {
+                        loadingMore -> "toolWindow.loadMore.loading"
+                        loadMoreError != null -> "toolWindow.loadMore.retry"
+                        else -> "toolWindow.loadMore"
+                    },
+                ]
+            loadMoreLink.isEnabled = !loadingMore
+            loadMoreLink.isVisible = nextPage != null
+            pageFooter.isVisible = nextPage != null || shown > 0
         }
 
         private companion object {
