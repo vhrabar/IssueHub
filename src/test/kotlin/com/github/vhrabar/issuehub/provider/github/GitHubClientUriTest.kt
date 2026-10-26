@@ -20,7 +20,7 @@ class GitHubClientUriTest {
     @Test
     fun `default query asks for open issues, newest first`() {
         assertEquals(
-            "$BASE_URL/repos/octocat/hello-world/issues?state=open&sort=created&direction=desc&per_page=50",
+            "$BASE_URL/repos/octocat/hello-world/issues?state=open&sort=created&direction=desc&per_page=50&page=1",
             client.listIssuesUri(repo, IssueQuery()).toString(),
         )
     }
@@ -31,7 +31,7 @@ class GitHubClientUriTest {
 
         assertEquals(
             "$BASE_URL/repos/octocat/hello-world/issues" +
-                "?state=all&sort=comments&direction=asc&per_page=50" +
+                "?state=all&sort=comments&direction=asc&per_page=50&page=1" +
                 "&labels=bug%2Chelp+wanted&creator=octocat&assignee=none&milestone=3",
             uri.toString(),
         )

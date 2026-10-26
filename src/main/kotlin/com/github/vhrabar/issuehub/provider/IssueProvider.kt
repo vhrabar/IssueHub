@@ -4,6 +4,7 @@ import com.github.vhrabar.issuehub.IssueHubBundle
 import com.github.vhrabar.issuehub.model.Issue
 import com.github.vhrabar.issuehub.model.IssueDetail
 import com.github.vhrabar.issuehub.model.IssueFilterOptions
+import com.github.vhrabar.issuehub.model.IssuePage
 import com.github.vhrabar.issuehub.model.IssueQuery
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
@@ -60,11 +61,11 @@ interface IssueProvider {
     /** HR desc of src, or null */
     fun sourceLabel(project: Project): String?
 
-    /** fetch issues for [project] */
+    /** fetch the [IssueQuery.page] of issues for [project] */
     suspend fun fetchIssues(
         project: Project,
         query: IssueQuery,
-    ): List<Issue>
+    ): IssuePage
 
     /** values the filter UI can offer; empty when the provider can't enumerate them */
     suspend fun fetchFilterOptions(project: Project): IssueFilterOptions = IssueFilterOptions()

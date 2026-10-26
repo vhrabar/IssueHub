@@ -7,6 +7,7 @@ import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -26,6 +27,7 @@ class GitHubClientTest {
 
     private var responseStatus = 200
     private var responseBody = "[]"
+    private var responseLink: String? = null
 
     private val repo = RepoCoordinates("octocat", "hello-world")
 
@@ -36,6 +38,7 @@ class GitHubClientTest {
             lastPath = exchange.requestURI.toString()
             lastAuthHeader = exchange.requestHeaders.getFirst("Authorization")
             lastApiVersionHeader = exchange.requestHeaders.getFirst("X-GitHub-Api-Version")
+            responseLink?.let { exchange.responseHeaders.add("Link", it) }
             respond(exchange, responseStatus, responseBody)
         }
         server.start()
@@ -80,7 +83,45 @@ class GitHubClientTest {
 
         val result = runBlocking { client.fetchIssues(repo, token = null, query = IssueQuery()) }
 
-        assertEquals(listOf(1, 3), result.map { it.number })
+        assertEquals(listOf(1, 3), result.issues.map { it.number })
+    }
+
+    /** A page that lost its pull requests is short, but GitHub still says another one follows. */
+    @Test
+    fun `reports a next page from the link header even when pull requests made the page short`() {
+        responseBody = "[${issueJson(1)}, ${issueJson(2, isPr = true)}]"
+        responseLink =
+            "<https://api.github.com/repositories/1/issues?page=2>; rel=\"next\", " +
+            "<https://api.github.com/repositories/1/issues?page=4>; rel=\"last\""
+
+        val result = runBlocking { client.fetchIssues(repo, token = null, query = IssueQuery(limit = 2)) }
+
+        assertEquals(listOf(1), result.issues.map { it.number })
+        assertTrue(result.hasNext)
+    }
+
+    @Test
+    fun `the last page has no next`() {
+        responseBody = "[${issueJson(1)}]"
+        responseLink = "<https://api.github.com/repositories/1/issues?page=1>; rel=\"first\""
+
+        val result = runBlocking { client.fetchIssues(repo, token = null, query = IssueQuery(page = 2)) }
+
+        assertFalse(result.hasNext)
+        assertTrue(lastPath!!, lastPath!!.contains("page=2"))
+    }
+
+    @Test
+    fun `search results carry their total and the page asked for`() {
+        responseBody = """{"total_count": 120, "items": [${issueJson(7)}]}"""
+        responseLink = "<https://api.github.com/search/issues?q=x&page=3>; rel=\"next\""
+
+        val result = runBlocking { client.fetchIssues(repo, token = null, query = IssueQuery(text = "crash", page = 2)) }
+
+        assertEquals(listOf(7), result.issues.map { it.number })
+        assertEquals(120, result.totalCount)
+        assertTrue(result.hasNext)
+        assertTrue(lastPath!!, lastPath!!.startsWith("/search/issues") && lastPath!!.contains("&page=2"))
     }
 
     @Test

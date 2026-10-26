@@ -278,7 +278,8 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                     if (id != requestId) return@invokeLater
                     options?.let { providerOptions = it }
                     result
-                        .onSuccess { issues ->
+                        .onSuccess { page ->
+                            val issues = page.issues
                             discoveredOptions = discoveredOptions.mergedWith(optionsFrom(issues))
                             filterBar.setOptions(providerOptions.mergedWith(discoveredOptions))
                             showIssues(issues, query)

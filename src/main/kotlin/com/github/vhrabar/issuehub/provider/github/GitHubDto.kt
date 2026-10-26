@@ -30,6 +30,7 @@ internal data class GitHubPullRequestRefDto(
 @Serializable
 internal data class GitHubSearchResultDto(
     val items: List<GitHubIssueDto> = emptyList(),
+    @SerialName("total_count") val totalCount: Int? = null,
 )
 
 /** Wire model for the GitHub REST API */

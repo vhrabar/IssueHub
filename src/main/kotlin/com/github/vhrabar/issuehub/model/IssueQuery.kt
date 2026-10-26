@@ -42,6 +42,8 @@ data class IssueQuery(
     val sortField: IssueSortField = IssueSortField.CREATED,
     val sortDirection: IssueSortDirection = IssueSortDirection.DESC,
     val limit: Int = 50,
+    /** 1-based; each page holds up to [limit] issues. */
+    val page: Int = 1,
 ) {
     /** True when the query narrows the result set beyond the default "all open issues" view. */
     val isFiltered: Boolean
@@ -53,6 +55,20 @@ data class IssueQuery(
                 author != null ||
                 milestone != null
 }
+
+/**
+ * One page of a query's results.
+ *
+ * [hasMore] comes from the provider rather than from comparing [issues] with the page size: a
+ * provider may drop entries after fetching (GitHub's issue list also returns pull requests), so a
+ * short page doesn't mean the last one.
+ */
+data class IssuePage(
+    val issues: List<Issue>,
+    val hasMore: Boolean = false,
+    /** Every match across all pages, when the provider reports it. */
+    val totalCount: Int? = null,
+)
 
 /**
  * The values a user can pick from in the filter UI, as reported by the provider.

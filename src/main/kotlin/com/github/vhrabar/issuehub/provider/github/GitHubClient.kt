@@ -40,6 +40,26 @@ internal data class GitHubViewer(
 /** `X-OAuth-Scopes` is a comma-separated list, and empty for a token that was granted none. */
 internal fun parseScopes(header: String): List<String> = header.split(",").map { it.trim() }.filter { it.isNotEmpty() }
 
+/** One page of issues, with pull requests already dropped. */
+internal data class GitHubIssuePage(
+    val issues: List<GitHubIssueDto>,
+    val hasNext: Boolean,
+    /** Only the search endpoint counts its matches; the plain issue list doesn't. */
+    val totalCount: Int? = null,
+)
+
+/**
+ * Whether a `Link` header points at a further page.
+ *
+ * GitHub lists `next`, `last`, `first` and `prev` as needed, each as `<url>; rel="name"`, and leaves
+ * the header out entirely when everything fit on one page.
+ */
+internal fun hasNextPage(link: String?): Boolean =
+    link
+        ?.split(",")
+        .orEmpty()
+        .any { part -> part.substringAfter(";", "").split(";").any { it.trim() == "rel=\"next\"" } }
+
 /** REST client based on teh the JDK [HttpClient] */
 internal class GitHubClient(
     private val baseUrl: String = "https://api.github.com",
@@ -59,19 +79,25 @@ internal class GitHubClient(
     /**
      * Free-text search needs `/search/issues`; every other filter is expressible on the plain
      * issue list, which has the far more generous rate limit, so text decides the route.
+     *
+     * Both endpoints say whether more pages follow in the `Link` header, which is the only reliable
+     * signal: the issue list counts pull requests towards `per_page` and they are dropped here.
      */
     suspend fun fetchIssues(
         repo: RepoCoordinates,
         token: String?,
         query: IssueQuery,
-    ): List<GitHubIssueDto> {
-        val issues =
-            if (query.text.isBlank()) {
-                get(listIssuesUri(repo, query), token) { json.decodeFromString<List<GitHubIssueDto>>(it) }
-            } else {
-                get(searchIssuesUri(repo, query), token) { json.decodeFromString<GitHubSearchResultDto>(it).items }
-            }
-        return issues.filterNot { it.isPullRequest }
+    ): GitHubIssuePage {
+        val search = query.text.isNotBlank()
+        val response = getResponse(if (search) searchIssuesUri(repo, query) else listIssuesUri(repo, query), token)
+        val hasNext = hasNextPage(response.headers().firstValue(LINK_HEADER).orElse(null))
+        return if (search) {
+            val result = json.decodeFromString<GitHubSearchResultDto>(response.body())
+            GitHubIssuePage(result.items.filterNot { it.isPullRequest }, hasNext, result.totalCount)
+        } else {
+            val issues = json.decodeFromString<List<GitHubIssueDto>>(response.body())
+            GitHubIssuePage(issues.filterNot { it.isPullRequest }, hasNext)
+        }
     }
 
     /**
@@ -246,6 +272,7 @@ internal class GitHubClient(
                 add("sort" to query.sortField.apiParam())
                 add("direction" to query.sortDirection.apiParam())
                 add("per_page" to query.limit.toString())
+                add("page" to query.page.toString())
                 if (query.labels.isNotEmpty()) add("labels" to query.labels.joinToString(","))
                 query.author?.let { add("creator" to it) }
                 when (val assignee = query.assignee) {
@@ -290,7 +317,8 @@ internal class GitHubClient(
             "q=${encode(terms.joinToString(" "))}" +
                 "&sort=${query.sortField.apiParam()}" +
                 "&order=${query.sortDirection.apiParam()}" +
-                "&per_page=${query.limit}"
+                "&per_page=${query.limit}" +
+                "&page=${query.page}"
         return URI.create("$baseUrl/search/issues?$params")
     }
 
@@ -376,6 +404,9 @@ internal class GitHubClient(
 
         /** Where GitHub lists what a classic token was granted; absent for fine-grained ones. */
         const val SCOPES_HEADER = "X-OAuth-Scopes"
+
+        /** Where GitHub says whether more pages follow; RFC 8288 format. */
+        const val LINK_HEADER = "Link"
 
         /** Filter dropdowns list every value at once; GitHub caps a page at 100. */
         const val OPTIONS_PER_PAGE = 100

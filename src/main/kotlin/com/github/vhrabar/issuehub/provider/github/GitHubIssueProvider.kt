@@ -10,6 +10,7 @@ import com.github.vhrabar.issuehub.model.IssueLabel
 import com.github.vhrabar.issuehub.model.IssueLinkedBranch
 import com.github.vhrabar.issuehub.model.IssueLinkedPullRequest
 import com.github.vhrabar.issuehub.model.IssueMilestone
+import com.github.vhrabar.issuehub.model.IssuePage
 import com.github.vhrabar.issuehub.model.IssueProjectField
 import com.github.vhrabar.issuehub.model.IssueProjectItem
 import com.github.vhrabar.issuehub.model.IssueQuery
@@ -297,11 +298,12 @@ class GitHubIssueProvider : IssueProvider {
     override suspend fun fetchIssues(
         project: Project,
         query: IssueQuery,
-    ): List<Issue> {
-        val repo = detect(project) ?: return emptyList()
+    ): IssuePage {
+        val repo = detect(project) ?: return IssuePage(emptyList())
         val (client, token) = session(repo)
         return try {
-            client.fetchIssues(repo, token, query).map { it.toIssue() }
+            val page = client.fetchIssues(repo, token, query)
+            IssuePage(page.issues.map { it.toIssue() }, page.hasNext, page.totalCount)
         } catch (e: GitHubApiException) {
             throw e.asAuthenticationFailure(hasToken = !token.isNullOrBlank()) ?: e
         }
