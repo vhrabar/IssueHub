@@ -1,7 +1,9 @@
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.changelog.ChangelogSectionUrlBuilder
 import org.jetbrains.changelog.markdownToHTML
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
 import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
 
 plugins {
@@ -82,6 +84,20 @@ intellijPlatform {
 
         // "What's New" shown to users on install and on every update
         changeNotes.set(renderedChangeNotes)
+    }
+
+    pluginVerification {
+        failureLevel.set(
+            listOf(
+                VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
+                VerifyPluginTask.FailureLevel.INTERNAL_API_USAGES,
+                VerifyPluginTask.FailureLevel.INVALID_PLUGIN,
+            ),
+        )
+        ides {
+            recommended()
+            create(IntelliJPlatformType.IntellijIdea, "263.7307.112")
+        }
     }
 }
 
