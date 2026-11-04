@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.time.Instant
 import kotlin.collections.filterNot
+import kotlin.time.Duration.Companion.seconds
 
 class GitHubApiException(
     message: String,
@@ -93,7 +94,7 @@ internal fun classifyNetworkFailure(
 internal const val MAX_ATTEMPTS = 2
 
 /** The pause before the retry; long enough for a proxy or load balancer hiccup to clear. */
-internal val RETRY_DELAY: Duration = Duration.ofSeconds(2)
+internal val RETRY_DELAY = 2.seconds
 
 /**
  * Whether a request that ended with [status], or never got an answer because of [failure], is
@@ -479,13 +480,15 @@ internal class GitHubClient(
         while (true) {
             val response =
                 try {
-                    http.send(request, HttpResponse.BodyHandlers.ofString())
+                    // Callers already run on IO; saying so here too keeps the blocking send off any
+                    // other dispatcher should one ever call this directly. Same-dispatcher switches are free.
+                    withContext(Dispatchers.IO) { http.send(request, HttpResponse.BodyHandlers.ofString()) }
                 } catch (e: IOException) {
                     val failure = classifyNetworkFailure(e, request.uri().host)
                     thisLogger().info("${request.method()}:GitHub unreachable for ${request.uri().path} (attempt $attempt): $e")
                     if (attempt < MAX_ATTEMPTS && isTransient(null, failure)) {
                         attempt++
-                        delay(RETRY_DELAY.toMillis())
+                        delay(RETRY_DELAY)
                         continue
                     }
                     throw failure
@@ -493,7 +496,7 @@ internal class GitHubClient(
             if (attempt < MAX_ATTEMPTS && isTransient(response.statusCode())) {
                 thisLogger().info("${request.method()}:GitHub answered ${response.statusCode()} for ${request.uri().path}, retrying")
                 attempt++
-                delay(RETRY_DELAY.toMillis())
+                delay(RETRY_DELAY)
                 continue
             }
             return response
