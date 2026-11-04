@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-04
+
+### Fixed
+
+- Importing an account from the IDE's GitHub settings no longer relies on the GitHub plugin's internal API, which IntelliJ IDEA 2026.3 flags as incompatible.
+
 ## [0.2.0] - 2026-10-10
 
 ### Added
@@ -119,7 +125,8 @@
 
 - Verified against IntelliJ Platform 2025.2 through 2026.2
 
-[Unreleased]: https://github.com/vhrabar/IssueHub/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/vhrabar/IssueHub/compare/0.2.1...HEAD
+[0.2.1]: https://github.com/vhrabar/IssueHub/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/vhrabar/IssueHub/compare/0.1.1...0.2.0
 [0.1.1]: https://github.com/vhrabar/IssueHub/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/vhrabar/IssueHub/compare/0.0.4...0.1.0
