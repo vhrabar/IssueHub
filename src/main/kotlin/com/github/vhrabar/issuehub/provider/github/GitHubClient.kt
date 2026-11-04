@@ -6,8 +6,10 @@ import com.github.vhrabar.issuehub.model.IssueSortDirection
 import com.github.vhrabar.issuehub.model.IssueSortField
 import com.github.vhrabar.issuehub.model.IssueStateFilter
 import com.github.vhrabar.issuehub.model.MilestoneFilter
+import com.github.vhrabar.issuehub.provider.NetworkUnavailableException
 import com.intellij.openapi.diagnostic.thisLogger
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -15,11 +17,13 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import org.jetbrains.annotations.VisibleForTesting
+import java.io.IOException
 import java.net.URI
 import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.net.http.HttpTimeoutException
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.time.Instant
@@ -59,6 +63,48 @@ internal fun rateLimitResetAt(
         null
     }
 }
+
+/**
+ * What a request that never got an HTTP answer ran into, worded for the tool window.
+ *
+ * The JDK client reports a timeout as [HttpTimeoutException] (connect timeouts included, as its
+ * subclass), and everything else, from a refused connection to a host name that didn't resolve,
+ * as some other [IOException], often with the real reason only in its cause. None of those is
+ * worth telling apart for the user: the server can't be reached, and retrying later may help.
+ */
+internal fun classifyNetworkFailure(
+    error: IOException,
+    host: String?,
+): NetworkUnavailableException {
+    val server = host ?: "GitHub"
+    return if (error is HttpTimeoutException) {
+        NetworkUnavailableException(NetworkUnavailableException.Kind.TIMEOUT, "$server didn't answer in time.", error)
+    } else {
+        NetworkUnavailableException(NetworkUnavailableException.Kind.OFFLINE, "Couldn't reach $server. Check your network connection.", error)
+    }
+}
+
+/** How many times a request is sent before a transient failure is given up on: once, plus two retries. */
+internal const val MAX_ATTEMPTS = 2
+
+/** The pause before the retry; long enough for a proxy or load balancer hiccup to clear. */
+internal val RETRY_DELAY: Duration = Duration.ofSeconds(2)
+
+/**
+ * Whether a request that ended with [status], or never got an answer because of [failure], is
+ * worth sending again.
+ *
+ * Only failures that say nothing about the request itself qualify: a gateway that couldn't reach
+ * GitHub (502, 504), GitHub briefly unavailable (503), or no answer in time. Being offline isn't
+ * retried, since a second later the network is just as gone, and neither is any 4xx: a rate limit,
+ * a bad token or a missing repository won't change by asking again.
+ */
+internal fun isTransient(
+    status: Int?,
+    failure: NetworkUnavailableException? = null,
+): Boolean = failure?.kind == NetworkUnavailableException.Kind.TIMEOUT || status in TRANSIENT_STATUSES
+
+private val TRANSIENT_STATUSES = setOf(502, 503, 504)
 
 /** The account behind a token, as `/user` and its headers describe it. */
 internal data class GitHubViewer(
@@ -380,7 +426,7 @@ internal class GitHubClient(
                 requestBuilder.header("Authorization", "Bearer $token")
             }
 
-            val response = http.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString())
+            val response = send(requestBuilder.build())
             if (response.statusCode() !in 200..299) {
                 thisLogger().warn("GET:GitHub API returned ${response.statusCode()} for ${uri.path}")
                 throw failure(response)
@@ -408,7 +454,7 @@ internal class GitHubClient(
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build()
 
-            val response = http.send(request, HttpResponse.BodyHandlers.ofString())
+            val response = send(request)
             if (response.statusCode() !in 200..299) {
                 thisLogger().warn("POST:GitHub API returned ${response.statusCode()} for ${uri.path}")
                 throw failure(response)
@@ -416,6 +462,38 @@ internal class GitHubClient(
 
             decode(response.body())
         }
+
+    /**
+     * Sends [request], turning a failure to reach the server into [NetworkUnavailableException],
+     * and sends it once more after [RETRY_DELAY] when the first try failed in a way [isTransient]
+     * says may clear by itself. Every request here only reads, GraphQL's POSTs included, so sending
+     * one twice is harmless.
+     */
+    private suspend fun send(request: HttpRequest): HttpResponse<String> {
+        var attempt = 1
+        while (true) {
+            val response =
+                try {
+                    http.send(request, HttpResponse.BodyHandlers.ofString())
+                } catch (e: IOException) {
+                    val failure = classifyNetworkFailure(e, request.uri().host)
+                    thisLogger().info("${request.method()}:GitHub unreachable for ${request.uri().path} (attempt $attempt): $e")
+                    if (attempt < MAX_ATTEMPTS && isTransient(null, failure)) {
+                        attempt++
+                        delay(RETRY_DELAY.toMillis())
+                        continue
+                    }
+                    throw failure
+                }
+            if (attempt < MAX_ATTEMPTS && isTransient(response.statusCode())) {
+                thisLogger().info("${request.method()}:GitHub answered ${response.statusCode()} for ${request.uri().path}, retrying")
+                attempt++
+                delay(RETRY_DELAY.toMillis())
+                continue
+            }
+            return response
+        }
+    }
 
     private fun failure(response: HttpResponse<String>): GitHubApiException {
         val status = response.statusCode()

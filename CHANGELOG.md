@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- The issue list loads a page at a time instead of stopping at the first 50. A footer under the list shows how many issues are loaded, out of how many match when GitHub reports a total, and a **Load more** link fetches the next page. Issues filed in the meantime don't show up twice, and if a page fails to load, the rows already shown stay and the footer offers **Retry**.
+- When GitHub's rate limit is reached, the tool window says so and shows the time it resets, instead of a raw error. Without an account, it explains that anonymous requests are limited to 60 an hour and links to the accounts page.
+
 ## [0.2.1] - 2026-11-04
 
 ### Fixed
