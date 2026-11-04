@@ -28,6 +28,7 @@ class GitHubClientTest {
     private var responseStatus = 200
     private var responseBody = "[]"
     private var responseLink: String? = null
+    private var responseHeaders: Map<String, String> = emptyMap()
 
     private val repo = RepoCoordinates("octocat", "hello-world")
 
@@ -39,6 +40,7 @@ class GitHubClientTest {
             lastAuthHeader = exchange.requestHeaders.getFirst("Authorization")
             lastApiVersionHeader = exchange.requestHeaders.getFirst("X-GitHub-Api-Version")
             responseLink?.let { exchange.responseHeaders.add("Link", it) }
+            responseHeaders.forEach { (name, value) -> exchange.responseHeaders.add(name, value) }
             respond(exchange, responseStatus, responseBody)
         }
         server.start()
@@ -156,6 +158,33 @@ class GitHubClientTest {
         assertErrorContains(403, "403")
         assertErrorContains(404, "404")
         assertErrorContains(500, "500")
+    }
+
+    @Test
+    fun `an exhausted allowance carries its reset time`() {
+        responseStatus = 403
+        responseBody = """{"message": "API rate limit exceeded"}"""
+        responseHeaders = mapOf("X-RateLimit-Remaining" to "0", "X-RateLimit-Reset" to "1792000000")
+        try {
+            runBlocking { client.fetchIssues(repo, token = null, query = IssueQuery()) }
+            fail("Expected GitHubApiException")
+        } catch (e: GitHubApiException) {
+            assertEquals(403, e.status)
+            assertEquals(java.time.Instant.ofEpochSecond(1_792_000_000), e.rateLimitResetAt)
+        }
+    }
+
+    @Test
+    fun `a forbidden repository is not a rate limit`() {
+        responseStatus = 403
+        responseBody = """{"message": "Resource not accessible by personal access token"}"""
+        responseHeaders = mapOf("X-RateLimit-Remaining" to "4990", "X-RateLimit-Reset" to "1792000000")
+        try {
+            runBlocking { client.fetchIssues(repo, token = "t", query = IssueQuery()) }
+            fail("Expected GitHubApiException")
+        } catch (e: GitHubApiException) {
+            assertNull(e.rateLimitResetAt)
+        }
     }
 
     private fun assertErrorContains(

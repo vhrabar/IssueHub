@@ -22,13 +22,43 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
 import java.time.Duration
+import java.time.Instant
 import kotlin.collections.filterNot
 
 class GitHubApiException(
     message: String,
     /** The HTTP status GitHub answered with; null when the request never got that far. */
     val status: Int? = null,
+    /** When GitHub will answer again; set only when the refusal was a rate limit. */
+    val rateLimitResetAt: Instant? = null,
 ) : Exception(message)
+
+/**
+ * When a refused request may be retried, or null when the refusal wasn't a rate limit.
+ *
+ * GitHub answers an exhausted allowance with 403 or 429 and `X-RateLimit-Remaining: 0`, and a
+ * secondary limit (too many requests too fast) with `Retry-After`, or with neither header and only
+ * a message saying so. A plain 403 is a permission problem, which retrying won't fix.
+ */
+internal fun rateLimitResetAt(
+    status: Int,
+    header: (String) -> String?,
+    body: String,
+    now: Instant,
+): Instant? {
+    if (status != 403 && status != 429) return null
+    header("Retry-After")?.trim()?.toLongOrNull()?.let { return now.plusSeconds(it) }
+    val exhausted = header("X-RateLimit-Remaining")?.trim() == "0"
+    if (exhausted) {
+        header("X-RateLimit-Reset")?.trim()?.toLongOrNull()?.let { return Instant.ofEpochSecond(it) }
+    }
+    return if (exhausted || status == 429 || body.contains("rate limit", ignoreCase = true)) {
+        // GitHub's advice when it names no time: wait at least a minute.
+        now.plusSeconds(60)
+    } else {
+        null
+    }
+}
 
 /** The account behind a token, as `/user` and its headers describe it. */
 internal data class GitHubViewer(
@@ -353,7 +383,7 @@ internal class GitHubClient(
             val response = http.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString())
             if (response.statusCode() !in 200..299) {
                 thisLogger().warn("GET:GitHub API returned ${response.statusCode()} for ${uri.path}")
-                throw GitHubApiException(describeError(response.statusCode()), response.statusCode())
+                throw failure(response)
             }
 
             response
@@ -381,16 +411,26 @@ internal class GitHubClient(
             val response = http.send(request, HttpResponse.BodyHandlers.ofString())
             if (response.statusCode() !in 200..299) {
                 thisLogger().warn("POST:GitHub API returned ${response.statusCode()} for ${uri.path}")
-                throw GitHubApiException(describeError(response.statusCode()), response.statusCode())
+                throw failure(response)
             }
 
             decode(response.body())
         }
 
+    private fun failure(response: HttpResponse<String>): GitHubApiException {
+        val status = response.statusCode()
+        val resetAt = rateLimitResetAt(status, { response.headers().firstValue(it).orElse(null) }, response.body(), Instant.now())
+        return if (resetAt != null) {
+            GitHubApiException("GitHub rate limit exceeded ($status).", status, resetAt)
+        } else {
+            GitHubApiException(describeError(status), status)
+        }
+    }
+
     private fun describeError(status: Int): String =
         when (status) {
             401 -> "Authentication failed (401). Check your GitHub token."
-            403 -> "Access forbidden or rate limit exceeded (403)."
+            403 -> "Access forbidden (403). Check the token's access to this repository."
             404 -> "Repository not found (404). Check the owner/name and token scope."
             422 -> "GitHub rejected the search query (422)."
             else -> "GitHub API request failed with status $status."

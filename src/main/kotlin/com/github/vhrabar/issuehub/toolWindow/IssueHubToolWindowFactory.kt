@@ -9,6 +9,7 @@ import com.github.vhrabar.issuehub.model.IssueQuery
 import com.github.vhrabar.issuehub.model.optionsFrom
 import com.github.vhrabar.issuehub.provider.AuthenticationRequiredException
 import com.github.vhrabar.issuehub.provider.IssueProvider
+import com.github.vhrabar.issuehub.provider.RateLimitedException
 import com.github.vhrabar.issuehub.settings.IssueHubConfigurable
 import com.github.vhrabar.issuehub.settings.IssueHubRepositoryConfigurable
 import com.intellij.openapi.Disposable
@@ -25,6 +26,7 @@ import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
+import com.intellij.util.text.DateFormatUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.runBlocking
@@ -235,8 +237,17 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             provider: IssueProvider,
             error: Throwable,
         ) {
+            if (error is RateLimitedException) {
+                listModel.clear()
+                showStatus(
+                    describe(error),
+                    // Anonymous callers get 60 requests an hour; any account raises that to thousands.
+                    if (error.authenticated) null else IssueHubBundle["toolWindow.auth.openSettings"] to ::openAccountSettings,
+                )
+                return
+            }
             if (error !is AuthenticationRequiredException) {
-                showStatus(IssueHubBundle["toolWindow.error", error.message ?: error.toString()])
+                showStatus(IssueHubBundle["toolWindow.error", describe(error)])
                 return
             }
             val key =
@@ -355,12 +366,25 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                             rememberPage(query.copy(page = page), next)
                         }.onFailure {
                             // The rows already loaded stay; only the footer says what went wrong.
-                            loadMoreError = it.message ?: it.toString()
+                            loadMoreError = describe(it)
                             updatePageFooter()
                         }
                 }
             }
         }
+
+        /** One line on what went wrong, with a rate limit spelled out as the time it lifts. */
+        private fun describe(error: Throwable): String =
+            when (error) {
+                is RateLimitedException -> {
+                    val at = DateFormatUtil.formatTime(error.resetAt.toEpochMilli())
+                    IssueHubBundle[if (error.authenticated) "toolWindow.rateLimited" else "toolWindow.rateLimited.anonymous", at]
+                }
+
+                else -> {
+                    error.message ?: error.toString()
+                }
+            }
 
         private fun updatePageFooter() {
             val shown = listModel.size()

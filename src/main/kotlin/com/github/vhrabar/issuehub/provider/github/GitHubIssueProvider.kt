@@ -22,6 +22,7 @@ import com.github.vhrabar.issuehub.provider.AuthenticationRequiredException
 import com.github.vhrabar.issuehub.provider.IdeAccountImporter
 import com.github.vhrabar.issuehub.provider.ImportableAccount
 import com.github.vhrabar.issuehub.provider.IssueProvider
+import com.github.vhrabar.issuehub.provider.RateLimitedException
 import com.github.vhrabar.issuehub.settings.IssueHubAccount
 import com.github.vhrabar.issuehub.settings.IssueHubAccounts
 import com.github.vhrabar.issuehub.settings.IssueHubProjectSettings
@@ -221,6 +222,11 @@ internal fun commitWebUrl(apiUrl: String): String? {
  */
 internal fun GitHubApiException.asAuthenticationFailure(hasToken: Boolean): AuthenticationRequiredException? =
     when {
+        // An anonymous caller hitting the limit is better told when it lifts, with the account as the way out.
+        rateLimitResetAt != null -> {
+            null
+        }
+
         hasToken && status == 401 -> {
             AuthenticationRequiredException(AuthenticationRequiredException.Reason.REJECTED, message.orEmpty(), this)
         }
@@ -233,6 +239,10 @@ internal fun GitHubApiException.asAuthenticationFailure(hasToken: Boolean): Auth
             null
         }
     }
+
+/** A rate-limit refusal in provider-neutral terms; null for any other failure. */
+internal fun GitHubApiException.asRateLimit(hasToken: Boolean): RateLimitedException? =
+    rateLimitResetAt?.let { RateLimitedException(it, authenticated = hasToken, message.orEmpty(), this) }
 
 private val ANONYMOUS_REFUSALS = setOf(401, 403, 404)
 
@@ -305,7 +315,8 @@ class GitHubIssueProvider : IssueProvider {
             val page = client.fetchIssues(repo, token, query)
             IssuePage(page.issues.map { it.toIssue() }, page.hasNext, page.totalCount)
         } catch (e: GitHubApiException) {
-            throw e.asAuthenticationFailure(hasToken = !token.isNullOrBlank()) ?: e
+            val hasToken = !token.isNullOrBlank()
+            throw e.asRateLimit(hasToken) ?: e.asAuthenticationFailure(hasToken) ?: e
         }
     }
 
