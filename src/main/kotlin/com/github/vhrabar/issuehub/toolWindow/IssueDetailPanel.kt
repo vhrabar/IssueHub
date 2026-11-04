@@ -4,11 +4,13 @@ import com.github.vhrabar.issuehub.IssueHubBundle
 import com.github.vhrabar.issuehub.model.Issue
 import com.github.vhrabar.issuehub.model.IssueDetail
 import com.github.vhrabar.issuehub.provider.IssueProvider
+import com.github.vhrabar.issuehub.provider.NetworkUnavailableException
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.ui.OnePixelSplitter
+import com.intellij.ui.components.ActionLink
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
@@ -57,6 +59,20 @@ internal class IssueDetailPanel(
     private val sidebar = IssueSidebarPanel()
 
     private val statusLabel = JBLabel(IssueHubBundle["detail.loading"])
+
+    /**
+     * Under the byline when the server couldn't be reached: the thread below then shows what the
+     * list row knew, and this says so, with a way to try again.
+     */
+    private val noticeLabel = JBLabel().apply { foreground = UIUtil.getErrorForeground() }
+    private val notice =
+        JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            isOpaque = false
+            border = JBUI.Borders.emptyTop(4)
+            isVisible = false
+            add(noticeLabel)
+            add(ActionLink(IssueHubBundle["detail.retry"]) { refresh() }.apply { border = JBUI.Borders.emptyLeft(8) })
+        }
     private val cardLayout = CardLayout()
     private val center =
         JBPanel<JBPanel<*>>(cardLayout).apply {
@@ -117,6 +133,7 @@ internal class IssueDetailPanel(
                 BorderLayout.NORTH,
             )
             add(byline, BorderLayout.CENTER)
+            add(notice, BorderLayout.SOUTH)
         }
 
     private fun actions(): JBPanel<*> =
@@ -166,6 +183,7 @@ internal class IssueDetailPanel(
             return
         }
         val id = ++requestId
+        notice.isVisible = false
         statusLabel.text = IssueHubBundle["detail.loading"]
         cardLayout.show(center, STATUS_CARD)
         sidebar.showLoading(issue)
@@ -180,7 +198,14 @@ internal class IssueDetailPanel(
                         renderHeader()
                         showBody(detail)
                     }.onFailure {
-                        statusLabel.text = IssueHubBundle["detail.error", it.message ?: it.toString()]
+                        val text = describeFailure(it, provider.displayName)
+                        if (it is NetworkUnavailableException) {
+                            noticeLabel.text = text
+                            notice.isVisible = true
+                            showBody(null)
+                            return@onFailure
+                        }
+                        statusLabel.text = IssueHubBundle["detail.error", text]
                         cardLayout.show(center, STATUS_CARD)
                         // The sidebar keeps what the list row knows rather than waiting on a request that failed.
                         sidebar.show(issue, null)

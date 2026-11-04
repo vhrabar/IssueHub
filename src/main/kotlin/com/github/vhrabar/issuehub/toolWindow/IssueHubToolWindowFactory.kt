@@ -9,6 +9,7 @@ import com.github.vhrabar.issuehub.model.IssueQuery
 import com.github.vhrabar.issuehub.model.optionsFrom
 import com.github.vhrabar.issuehub.provider.AuthenticationRequiredException
 import com.github.vhrabar.issuehub.provider.IssueProvider
+import com.github.vhrabar.issuehub.provider.NetworkUnavailableException
 import com.github.vhrabar.issuehub.provider.RateLimitedException
 import com.github.vhrabar.issuehub.settings.IssueHubConfigurable
 import com.github.vhrabar.issuehub.settings.IssueHubRepositoryConfigurable
@@ -26,7 +27,6 @@ import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
-import com.intellij.util.text.DateFormatUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.runBlocking
@@ -98,7 +98,8 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         // CENTER swaps between a status message and the issue list.
         private val statusLabel = JBLabel(IssueHubBundle["toolWindow.placeholder"])
 
-        // Shown when the fix is on a settings page, so the way there is one click from the message.
+        // Shown when there is something to do about the message, such as a settings page to open or a
+        // request to retry, so the remedy is one click away.
         private var statusLinkAction: () -> Unit = {}
         private val statusLink = ActionLink("") { statusLinkAction() }.apply { isVisible = false }
 
@@ -219,7 +220,7 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             refresh(reloadOptions = true)
         }
 
-        /** [link] is the text and target of a settings page that would fix what [text] describes. */
+        /** [link] is the text and action of whatever would fix what [text] describes. */
         private fun showStatus(
             text: String,
             link: Pair<String, () -> Unit>? = null,
@@ -243,6 +244,15 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                     describe(error),
                     // Anonymous callers get 60 requests an hour; any account raises that to thousands.
                     if (error.authenticated) null else IssueHubBundle["toolWindow.auth.openSettings"] to ::openAccountSettings,
+                )
+                return
+            }
+            if (error is NetworkUnavailableException) {
+                listModel.clear()
+                // Nothing on a settings page fixes a dropped connection; trying again is the remedy.
+                showStatus(
+                    describe(error),
+                    IssueHubBundle["toolWindow.retry"] to { refresh(reloadOptions = true) },
                 )
                 return
             }
@@ -373,18 +383,9 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             }
         }
 
-        /** One line on what went wrong, with a rate limit spelled out as the time it lifts. */
+        /** One line on what went wrong; see [describeFailure]. */
         private fun describe(error: Throwable): String =
-            when (error) {
-                is RateLimitedException -> {
-                    val at = DateFormatUtil.formatTime(error.resetAt.toEpochMilli())
-                    IssueHubBundle[if (error.authenticated) "toolWindow.rateLimited" else "toolWindow.rateLimited.anonymous", at]
-                }
-
-                else -> {
-                    error.message ?: error.toString()
-                }
-            }
+            describeFailure(error, IssueProvider.firstApplicable(project)?.displayName ?: IssueHubBundle["toolWindow.title"])
 
         private fun updatePageFooter() {
             val shown = listModel.size()

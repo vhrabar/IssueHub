@@ -9,6 +9,8 @@ package com.github.vhrabar.issuehub.provider
  */
 class NetworkUnavailableException(
     val kind: Kind,
+    /** The host that couldn't be reached, for the message; null when the request had none. */
+    val server: String?,
     message: String,
     cause: Throwable? = null,
 ) : Exception(message, cause) {

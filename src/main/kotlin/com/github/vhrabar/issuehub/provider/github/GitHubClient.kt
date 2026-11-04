@@ -78,9 +78,14 @@ internal fun classifyNetworkFailure(
 ): NetworkUnavailableException {
     val server = host ?: "GitHub"
     return if (error is HttpTimeoutException) {
-        NetworkUnavailableException(NetworkUnavailableException.Kind.TIMEOUT, "$server didn't answer in time.", error)
+        NetworkUnavailableException(NetworkUnavailableException.Kind.TIMEOUT, host, "$server didn't answer in time.", error)
     } else {
-        NetworkUnavailableException(NetworkUnavailableException.Kind.OFFLINE, "Couldn't reach $server. Check your network connection.", error)
+        NetworkUnavailableException(
+            NetworkUnavailableException.Kind.OFFLINE,
+            host,
+            "Couldn't reach $server. Check your network connection.",
+            error,
+        )
     }
 }
 
