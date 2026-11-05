@@ -626,6 +626,7 @@ internal class GitHubClient(
                 IssueSortField.CREATED -> "created"
                 IssueSortField.UPDATED -> "updated"
                 IssueSortField.COMMENTS -> "comments"
+                IssueSortField.NUMBER -> "created"
             }
 
         fun IssueSortDirection.apiParam(): String =

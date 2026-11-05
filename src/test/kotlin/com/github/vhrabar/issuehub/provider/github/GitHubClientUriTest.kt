@@ -97,6 +97,15 @@ class GitHubClientUriTest {
         )
     }
 
+    /** GitHub has no number sort, and creation order is the same order. */
+    @Test
+    fun `sorting by number asks for creation order`() {
+        val query = IssueQuery(sortField = IssueSortField.NUMBER, sortDirection = IssueSortDirection.ASC)
+
+        assertEquals("created", client.listIssuesUri(repo, query).decodedParam("sort"))
+        assertEquals("created", client.searchIssuesUri(repo, query).decodedParam("sort"))
+    }
+
     private fun filtered() =
         IssueQuery(
             state = IssueStateFilter.ALL,

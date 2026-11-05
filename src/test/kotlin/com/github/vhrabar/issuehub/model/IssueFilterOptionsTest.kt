@@ -43,6 +43,15 @@ class IssueFilterOptionsTest {
         assertEquals(listOf("adam", "Zoe"), merged.authors)
     }
 
+    /** The tool window merges in options seen on issues, which never know who is signed in. */
+    @Test
+    fun `merging keeps the current user`() {
+        val provider = IssueFilterOptions(currentUser = "adam")
+
+        assertEquals("adam", provider.mergedWith(IssueFilterOptions()).currentUser)
+        assertEquals("adam", IssueFilterOptions().mergedWith(provider).currentUser)
+    }
+
     @Test
     fun `loaded issues contribute the values they mention`() {
         val options = optionsFrom(listOf(issue(1, assignee = "mia", author = "adam"), issue(2, author = "mia")))

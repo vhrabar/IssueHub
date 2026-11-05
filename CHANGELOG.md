@@ -10,6 +10,8 @@
 - When GitHub's rate limit is reached, the tool window says so and shows the time it resets, instead of a raw error. Without an account, it explains that anonymous requests are limited to 60 an hour and links to the accounts page.
 - When GitHub can't be reached, because the network is down, the host doesn't resolve or the server doesn't answer in time, the tool window names the server and offers **Retry** instead of showing a raw connection error. An open issue keeps showing what the list already knew about it, with the same notice and a **Retry** link above it.
 - A request that times out, or that GitHub answers with 502, 503 or 504, is sent two more times after a two-second delay before an error is shown.
+- **Assigned to me** in the **Assignee** dropdown, offered when the account reading the repository has a known login.
+- **Number** in the **Sort** dropdown. GitHub can't sort by number, so this uses creation order, which only differs for issues transferred in from another repository.
 
 ## [0.2.1] - 2026-11-04
 

@@ -4,7 +4,7 @@ package com.github.vhrabar.issuehub.model
 enum class IssueStateFilter { OPEN, CLOSED, ALL }
 
 /** The field a result list is ordered by. */
-enum class IssueSortField { CREATED, UPDATED, COMMENTS }
+enum class IssueSortField { CREATED, UPDATED, COMMENTS, NUMBER }
 
 enum class IssueSortDirection { ASC, DESC }
 
@@ -81,6 +81,8 @@ data class IssueFilterOptions(
     val assignees: List<String> = emptyList(),
     val milestones: List<IssueMilestone> = emptyList(),
     val authors: List<String> = emptyList(),
+    /** The login of the account reading the repository, when known, for an "assigned to me" choice. */
+    val currentUser: String? = null,
 ) {
     /** Union with [other], de-duplicated and alphabetically ordered. */
     fun mergedWith(other: IssueFilterOptions): IssueFilterOptions =
@@ -89,6 +91,7 @@ data class IssueFilterOptions(
             assignees = (assignees + other.assignees).distinct().sortedBy(String::lowercase),
             milestones = (milestones + other.milestones).distinctBy { it.number }.sortedBy { it.title.lowercase() },
             authors = (authors + other.authors).distinct().sortedBy(String::lowercase),
+            currentUser = currentUser ?: other.currentUser,
         )
 }
 

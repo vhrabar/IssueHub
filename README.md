@@ -55,7 +55,8 @@ repository from a dedicated tool window, without leaving your editor.
    that will close the issue, marked open, draft, merged or closed, and the branches opened for it.
    Drag the divider to resize the sidebar; the IDE remembers where you left it.
 7. Use the search field and the **State / Author / Assignee / Label / Milestone / Sort** dropdowns to
-   narrow the list; **Reset** clears everything back to open issues, newest first.
+   narrow the list; **Reset** clears everything back to open issues, newest first. **Assignee** offers
+   **Assigned to me** once your account's login is known, and **Sort** includes the issue number.
 
 Filtering and sorting run on GitHub's side, so the results are the whole repository's issues, not
 just the ones already on screen. Typing in the search field uses GitHub's search endpoint, which is

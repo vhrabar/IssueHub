@@ -110,6 +110,7 @@ internal class IssueFilterBar(
     /** Replaces the values offered by the dropdowns; the current selection is left untouched. */
     fun setOptions(options: IssueFilterOptions) {
         this.options = options
+        refreshLinks()
     }
 
     private fun scheduleSearch() {
@@ -155,8 +156,14 @@ internal class IssueFilterBar(
         choiceLink(
             name = IssueHubBundle["filter.assignee"],
             choices = {
-                listOf(Choice(IssueHubBundle["filter.assignee.unassigned"], AssigneeFilter.Unassigned as AssigneeFilter)) +
-                    options.assignees.map { Choice(it, AssigneeFilter.User(it)) }
+                val me = options.currentUser
+                buildList<Choice<AssigneeFilter>> {
+                    me?.let { add(Choice(IssueHubBundle["filter.assignee.me"], AssigneeFilter.User(it))) }
+                    add(Choice(IssueHubBundle["filter.assignee.unassigned"], AssigneeFilter.Unassigned))
+                    options.assignees
+                        .filterNot { it.equals(me, ignoreCase = true) }
+                        .forEach { add(Choice(it, AssigneeFilter.User(it))) }
+                }
             },
             selected = { query.assignee },
             display = ::assigneeText,
@@ -309,7 +316,8 @@ internal class IssueFilterBar(
     private fun assigneeText(filter: AssigneeFilter): String =
         when (filter) {
             AssigneeFilter.Unassigned -> IssueHubBundle["filter.assignee.unassigned"]
-            is AssigneeFilter.User -> filter.login
+            is AssigneeFilter.User ->
+                if (filter.login.equals(options.currentUser, ignoreCase = true)) IssueHubBundle["filter.assignee.me.short"] else filter.login
         }
 
     private fun milestoneText(filter: MilestoneFilter): String =
@@ -323,6 +331,7 @@ internal class IssueFilterBar(
             IssueSortField.CREATED -> IssueHubBundle["filter.sort.created"]
             IssueSortField.UPDATED -> IssueHubBundle["filter.sort.updated"]
             IssueSortField.COMMENTS -> IssueHubBundle["filter.sort.comments"]
+            IssueSortField.NUMBER -> IssueHubBundle["filter.sort.number"]
         }
 
     private fun sortDirectionText(direction: IssueSortDirection): String =

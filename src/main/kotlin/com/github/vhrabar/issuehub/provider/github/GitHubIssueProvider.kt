@@ -368,6 +368,10 @@ class GitHubIssueProvider : IssueProvider {
                     .getOrDefault(emptyList()),
             // GitHub has no "issue authors" endpoint; collaborators are the closest cheap stand-in.
             authors = assignees,
+            currentUser =
+                accountFor(repo, IssueHubAccounts.getInstance().accountsFor(identifier))
+                    ?.login
+                    ?.takeIf { it.isNotBlank() },
         )
     }
 
