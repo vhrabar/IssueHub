@@ -13,6 +13,7 @@ import com.github.vhrabar.issuehub.provider.NetworkUnavailableException
 import com.github.vhrabar.issuehub.provider.RateLimitedException
 import com.github.vhrabar.issuehub.settings.IssueHubConfigurable
 import com.github.vhrabar.issuehub.settings.IssueHubRepositoryConfigurable
+import com.github.vhrabar.issuehub.settings.IssueHubSettings
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.options.ShowSettingsUtil
@@ -27,6 +28,8 @@ import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
+import com.intellij.util.Alarm
+import com.intellij.util.text.DateFormatUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.runBlocking
@@ -35,8 +38,10 @@ import java.awt.CardLayout
 import java.awt.Component
 import java.awt.Container
 import java.awt.FlowLayout
+import java.awt.Rectangle
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import java.time.Instant
 import javax.swing.DefaultListModel
 import javax.swing.JButton
 import javax.swing.JComponent
@@ -111,6 +116,22 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                 add(pageLabel)
                 add(loadMoreLink)
             }
+
+        // Above the list when a reload failed but the rows it would have replaced are still good.
+        private val staleLabel = JBLabel().apply { foreground = UIUtil.getErrorForeground() }
+        private val staleBar =
+            JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, JBUI.scale(8), JBUI.scale(4))).apply {
+                isVisible = false
+                add(staleLabel)
+                add(ActionLink(IssueHubBundle["toolWindow.retry"]) { refresh(reloadOptions = true) })
+            }
+
+        // Rows ellipsize to the viewport width, so a horizontal scrollbar would never be useful.
+        private val listScroll =
+            JBScrollPane(issueList).apply {
+                horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
+                border = JBUI.Borders.empty()
+            }
         private val cardLayout = CardLayout()
         private val center =
             JBPanel<JBPanel<*>>(cardLayout).apply {
@@ -127,16 +148,10 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                     },
                     STATUS_CARD,
                 )
-                // Rows ellipsize to the viewport width, so a horizontal scrollbar would never be useful.
                 add(
                     JBPanel<JBPanel<*>>(BorderLayout()).apply {
-                        add(
-                            JBScrollPane(issueList).apply {
-                                horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
-                                border = JBUI.Borders.empty()
-                            },
-                            BorderLayout.CENTER,
-                        )
+                        add(staleBar, BorderLayout.NORTH)
+                        add(listScroll, BorderLayout.CENTER)
                         add(pageFooter, BorderLayout.SOUTH)
                     },
                     LIST_CARD,
@@ -164,6 +179,17 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         private var loadingMore = false
         private var loadMoreError: String? = null
 
+        /** What came back last, shown at once while the same list is read again. */
+        private var lastResult: IssueListSnapshot? = null
+        private var shownSource: String? = null
+        private var refreshing = false
+        private var staleError: String? = null
+
+        /** When a timer tick may reload again; see [shouldAutoRefresh]. */
+        private var lastAttemptAt: Instant? = null
+        private var rateLimitedUntil: Instant? = null
+        private val autoRefreshAlarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, this)
+
         private val filterBar =
             IssueFilterBar(this, buildActions()) { refresh(reloadOptions = false) }
 
@@ -183,9 +209,36 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             )
 
             refresh(reloadOptions = true)
+            scheduleAutoRefresh()
         }
 
         override fun dispose() = Unit
+
+        /** Ticks often and decides each time, so a changed interval needs no listener or restart. */
+        private fun scheduleAutoRefresh() {
+            autoRefreshAlarm.addRequest(
+                {
+                    autoRefreshTick()
+                    scheduleAutoRefresh()
+                },
+                AUTO_REFRESH_TICK_MS,
+            )
+        }
+
+        private fun autoRefreshTick() {
+            val due =
+                shouldAutoRefresh(
+                    intervalMinutes = IssueHubSettings.getInstance().autoRefreshMinutes,
+                    lastAttemptAt = lastAttemptAt,
+                    now = Instant.now(),
+                    rateLimitedUntil = rateLimitedUntil,
+                    visible = isShowing,
+                    busy = refreshing || loadingMore,
+                    pagesLoaded = shownQuery?.page ?: 1,
+                )
+            // The label and milestone lists barely change, so a tick spends one request on the issues.
+            if (due) refresh(reloadOptions = false, background = true)
+        }
 
         /**
          * Opens [issue] in the editor area rather than inside this tool window, so the description gets
@@ -211,12 +264,14 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         /** Reloads on the way back: the accounts page is where a token is added or dropped. */
         private fun openAccountSettings() {
             ShowSettingsUtil.getInstance().showSettingsDialog(project, IssueHubConfigurable::class.java)
+            lastResult = null
             refresh(reloadOptions = true)
         }
 
         /** Reloads on the way back, since naming a repository is what makes a provider apply. */
         private fun openRepositorySettings() {
             ShowSettingsUtil.getInstance().showSettingsDialog(project, IssueHubRepositoryConfigurable::class.java)
+            lastResult = null
             refresh(reloadOptions = true)
         }
 
@@ -266,6 +321,7 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                     AuthenticationRequiredException.Reason.REJECTED -> "toolWindow.auth.rejected"
                 }
             listModel.clear()
+            lastResult = null
             showStatus(
                 IssueHubBundle[key, provider.displayName],
                 IssueHubBundle["toolWindow.auth.openSettings"] to ::openAccountSettings,
@@ -276,13 +332,40 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             issues: List<Issue>,
             query: IssueQuery,
         ) {
-            listModel.clear()
             if (issues.isEmpty()) {
+                listModel.clear()
                 showStatus(IssueHubBundle[if (query.isFiltered) "toolWindow.emptyFiltered" else "toolWindow.empty"])
                 return
             }
-            issues.forEach(listModel::addElement)
+            if (shownRows() != issues) replaceRows(issues, query)
             cardLayout.show(center, LIST_CARD)
+        }
+
+        private fun shownRows(): List<Issue> = (0 until listModel.size()).map { listModel[it] }
+
+        /** A new answer to the same query keeps the user's place; a different query starts over. */
+        private fun replaceRows(
+            issues: List<Issue>,
+            query: IssueQuery,
+        ) {
+            val sameList = shownQuery?.copy(page = 1) == query.copy(page = 1)
+            val selectedId = issueList.selectedValue?.id
+            val visible = Rectangle(listScroll.viewport.viewRect)
+            listModel.clear()
+            issues.forEach(listModel::addElement)
+            if (!sameList) return
+            selectedId?.let { id -> issueList.selectedIndex = issues.indexOfFirst { it.id == id } }
+            // After the layout pass, once the list has its new height to scroll within.
+            ApplicationManager.getApplication().invokeLater { issueList.scrollRectToVisible(visible) }
+        }
+
+        /** Puts [snapshot] on screen as though it had just been loaded. */
+        private fun showSnapshot(snapshot: IssueListSnapshot) {
+            showIssues(snapshot.issues, snapshot.query)
+            shownQuery = snapshot.query
+            nextPage = snapshot.nextPage
+            totalCount = snapshot.totalCount
+            loadMoreError = null
         }
 
         /** Names the tab after the repository, with the full `owner/name` as its tooltip. */
@@ -296,8 +379,16 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         /**
          * [reloadOptions] re-reads the label/assignee/milestone lists too; they barely ever change,
          * so filter and search changes skip that round trip and only re-run the query.
+         *
+         * A list already read for this query goes on screen straight away and is replaced when the
+         * answer comes. [background] is for reloads nobody asked for, which don't put up the
+         * loading message when there is no such list.
          */
-        private fun refresh(reloadOptions: Boolean) {
+        private fun refresh(
+            reloadOptions: Boolean,
+            background: Boolean = false,
+        ) {
+            lastAttemptAt = Instant.now()
             val provider = IssueProvider.firstApplicable(project)
             showSource(provider)
             if (provider == null) {
@@ -308,9 +399,16 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                 return
             }
             val query = filterBar.query
+            val source = provider.sourceLabel(project)
             val id = ++requestId
             loadingMore = false
-            showStatus(IssueHubBundle["toolWindow.loading"])
+            refreshing = true
+            val cached = lastResult?.takeIf { it.matches(source, query) && it.issues.isNotEmpty() }
+            when {
+                cached != null -> showSnapshot(cached)
+                !background -> showStatus(IssueHubBundle["toolWindow.loading"])
+            }
+            updatePageFooter()
             // fetchIssues is a suspend fn doing network IO
             ApplicationManager.getApplication().executeOnPooledThread {
                 val result = runCatching { runBlocking { provider.fetchIssues(project, query) } }
@@ -322,15 +420,26 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                     }
                 ApplicationManager.getApplication().invokeLater {
                     if (id != requestId) return@invokeLater
+                    refreshing = false
                     options?.let { providerOptions = it }
                     result
                         .onSuccess { page ->
+                            rateLimitedUntil = null
+                            shownSource = source
                             val issues = page.issues
                             discoveredOptions = discoveredOptions.mergedWith(optionsFrom(issues))
                             filterBar.setOptions(providerOptions.mergedWith(discoveredOptions))
                             showIssues(issues, query)
                             rememberPage(query, page)
-                        }.onFailure { showFailure(provider, it) }
+                        }.onFailure { error ->
+                            if (error is RateLimitedException) rateLimitedUntil = error.resetAt
+                            if (cached != null && keepsRowsOn(error, background)) {
+                                staleError = describe(error)
+                            } else {
+                                showFailure(provider, error)
+                            }
+                            updatePageFooter()
+                        }
                 }
             }
         }
@@ -343,6 +452,8 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             nextPage = if (page.hasMore) query.page + 1 else null
             totalCount = page.totalCount
             loadMoreError = null
+            staleError = null
+            lastResult = IssueListSnapshot(shownSource, query, shownRows(), nextPage, totalCount, Instant.now())
             updatePageFooter()
         }
 
@@ -353,7 +464,8 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         private fun loadMore() {
             val query = shownQuery ?: return
             val page = nextPage ?: return
-            if (loadingMore) return
+            // A reload in flight replaces the rows, which would leave a gap before this page.
+            if (loadingMore || refreshing) return
             val provider = IssueProvider.firstApplicable(project) ?: return
             val id = requestId
             loadingMore = true
@@ -389,12 +501,23 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
 
         private fun updatePageFooter() {
             val shown = listModel.size()
+            val count =
+                if (totalCount != null) {
+                    IssueHubBundle["toolWindow.page.countOfTotal", shown, totalCount!!]
+                } else {
+                    IssueHubBundle["toolWindow.page.count", shown]
+                }
+            val fetchedAt = lastResult?.fetchedAt
             pageLabel.text =
                 when {
                     loadMoreError != null -> IssueHubBundle["toolWindow.loadMore.error", loadMoreError!!]
-                    totalCount != null -> IssueHubBundle["toolWindow.page.countOfTotal", shown, totalCount!!]
-                    else -> IssueHubBundle["toolWindow.page.count", shown]
+                    refreshing -> IssueHubBundle["toolWindow.page.refreshing", count]
+                    fetchedAt != null -> IssueHubBundle["toolWindow.page.updated", count, DateFormatUtil.formatTime(fetchedAt.toEpochMilli())]
+                    else -> count
                 }
+            staleLabel.text = staleError.orEmpty()
+            staleLabel.toolTipText = staleError
+            staleBar.isVisible = staleError != null
             loadMoreLink.text =
                 IssueHubBundle[
                     when {
@@ -403,7 +526,7 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
                         else -> "toolWindow.loadMore"
                     },
                 ]
-            loadMoreLink.isEnabled = !loadingMore
+            loadMoreLink.isEnabled = !loadingMore && !refreshing
             loadMoreLink.isVisible = nextPage != null
             pageFooter.isVisible = nextPage != null || shown > 0
         }
@@ -411,6 +534,9 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
         private companion object {
             const val STATUS_CARD = "status"
             const val LIST_CARD = "list"
+
+            /** How often the timer looks at whether a reload is due, not how often one happens. */
+            const val AUTO_REFRESH_TICK_MS = 60_000
         }
     }
 }

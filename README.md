@@ -58,6 +58,10 @@ repository from a dedicated tool window, without leaving your editor.
    narrow the list; **Reset** clears everything back to open issues, newest first. **Assignee** offers
    **Assigned to me** once your account's login is known, and **Sort** includes the issue number.
 
+The list stays on screen while it reloads, and when GitHub can't be reached the last result stays
+with a **Retry** link above it. **Settings | Tools | IssueHub** can also refresh it automatically, for
+every project; that only runs while the tool window is visible and only the first page is loaded.
+
 Filtering and sorting run on GitHub's side, so the results are the whole repository's issues, not
 just the ones already on screen. Typing in the search field uses GitHub's search endpoint, which is
 rate limited more tightly than the plain issue list, an authenticated token raises that limit

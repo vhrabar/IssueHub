@@ -3,8 +3,10 @@ package com.github.vhrabar.issuehub.settings
 import com.github.vhrabar.issuehub.IssueHubBundle
 import com.github.vhrabar.issuehub.provider.AccountVerification
 import com.github.vhrabar.issuehub.provider.IssueProvider
+import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.JBColor
+import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.ActionLink
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
@@ -44,6 +46,14 @@ internal class IssueHubSettingsPanel : JBPanel<IssueHubSettingsPanel>(BorderLayo
 
     private val sections = JBPanel<JBPanel<*>>(VerticalLayout(JBUI.scale(SECTION_GAP)))
 
+    private val autoRefresh =
+        ComboBox(IssueHubSettings.AUTO_REFRESH_CHOICES.toTypedArray()).apply {
+            renderer =
+                SimpleListCellRenderer.create("") { minutes ->
+                    if (minutes == 0) IssueHubBundle["settings.autoRefresh.off"] else IssueHubBundle["settings.autoRefresh.minutes", minutes]
+                }
+        }
+
     init {
         border = JBUI.Borders.empty(10)
         add(
@@ -53,13 +63,21 @@ internal class IssueHubSettingsPanel : JBPanel<IssueHubSettingsPanel>(BorderLayo
             },
             BorderLayout.NORTH,
         )
-        add(sections, BorderLayout.CENTER)
+        add(
+            JBPanel<JBPanel<*>>(VerticalLayout(JBUI.scale(SECTION_GAP))).apply {
+                add(sections)
+                add(autoRefreshRow())
+            },
+            BorderLayout.CENTER,
+        )
         reset()
     }
 
     fun isModified(): Boolean {
         val stored = IssueHubAccounts.getInstance().accounts
-        return pending.any { it.token != null } || stored.any { account -> pending.none { it.account.id == account.id } }
+        return pending.any { it.token != null } ||
+            stored.any { account -> pending.none { it.account.id == account.id } } ||
+            autoRefresh.item != IssueHubSettings.getInstance().autoRefreshMinutes
     }
 
     /** Removals first, so replacing an account on the same server doesn't clash with the old one. */
@@ -71,14 +89,27 @@ internal class IssueHubSettingsPanel : JBPanel<IssueHubSettingsPanel>(BorderLayo
         pending.forEach { entry ->
             entry.token?.let { accounts.add(entry.account.providerId, entry.account.serverUrl, entry.account.login, it) }
         }
+        IssueHubSettings.getInstance().autoRefreshMinutes = autoRefresh.item
         reset()
     }
 
     fun reset() {
         pending.clear()
         IssueHubAccounts.getInstance().accounts.forEach { pending += PendingAccount(it) }
+        autoRefresh.item = IssueHubSettings.getInstance().autoRefreshMinutes
         render()
     }
+
+    private fun autoRefreshRow(): JComponent =
+        JBPanel<JBPanel<*>>(VerticalLayout(JBUI.scale(ROW_GAP))).apply {
+            add(
+                JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+                    add(JBLabel(IssueHubBundle["settings.autoRefresh.label"]).apply { border = JBUI.Borders.emptyRight(ROW_GAP) })
+                    add(autoRefresh)
+                },
+            )
+            add(JBLabel(IssueHubBundle["settings.autoRefresh.comment"]).apply { foreground = UIUtil.getContextHelpForeground() })
+        }
 
     private fun render() {
         sections.removeAll()

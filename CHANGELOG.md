@@ -12,6 +12,8 @@
 - A request that times out, or that GitHub answers with 502, 503 or 504, is sent two more times after a two-second delay before an error is shown.
 - **Assigned to me** in the **Assignee** dropdown, offered when the account reading the repository has a known login.
 - **Number** in the **Sort** dropdown. GitHub can't sort by number, so this uses creation order, which only differs for issues transferred in from another repository.
+- The issue list stays on screen while it reloads, and the footer shows when it was last updated. If the reload fails because GitHub can't be reached or the rate limit is hit, the rows stay, with the reason and **Retry** above them. The last result is kept in memory only, so it doesn't survive restarting the IDE.
+- **Refresh the issue list automatically** under **Settings | Tools | IssueHub**, off by default, every 5, 15 or 30 minutes for all projects. It only runs while the tool window is visible and only the first page is loaded, waits out a rate limit, and keeps your selection and scroll position.
 
 ## [0.2.1] - 2026-11-04
 
