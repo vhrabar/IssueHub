@@ -157,7 +157,7 @@ internal class IssueFilterBar(
             name = IssueHubBundle["filter.assignee"],
             choices = {
                 val me = options.currentUser
-                buildList<Choice<AssigneeFilter>> {
+                buildList {
                     me?.let { add(Choice(IssueHubBundle["filter.assignee.me"], AssigneeFilter.User(it))) }
                     add(Choice(IssueHubBundle["filter.assignee.unassigned"], AssigneeFilter.Unassigned))
                     options.assignees
