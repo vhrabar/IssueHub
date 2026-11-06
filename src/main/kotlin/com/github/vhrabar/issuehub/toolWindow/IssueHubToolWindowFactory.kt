@@ -510,10 +510,25 @@ class IssueHubToolWindowFactory : ToolWindowFactory {
             val fetchedAt = lastResult?.fetchedAt
             pageLabel.text =
                 when {
-                    loadMoreError != null -> IssueHubBundle["toolWindow.loadMore.error", loadMoreError!!]
-                    refreshing -> IssueHubBundle["toolWindow.page.refreshing", count]
-                    fetchedAt != null -> IssueHubBundle["toolWindow.page.updated", count, DateFormatUtil.formatTime(fetchedAt.toEpochMilli())]
-                    else -> count
+                    loadMoreError != null -> {
+                        IssueHubBundle["toolWindow.loadMore.error", loadMoreError!!]
+                    }
+
+                    refreshing -> {
+                        IssueHubBundle["toolWindow.page.refreshing", count]
+                    }
+
+                    fetchedAt != null -> {
+                        IssueHubBundle[
+                            "toolWindow.page.updated", count, DateFormatUtil.formatTime(
+                                fetchedAt.toEpochMilli(),
+                            ),
+                        ]
+                    }
+
+                    else -> {
+                        count
+                    }
                 }
             staleLabel.text = staleError.orEmpty()
             staleLabel.toolTipText = staleError

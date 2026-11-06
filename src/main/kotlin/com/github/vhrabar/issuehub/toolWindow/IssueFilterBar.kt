@@ -315,9 +315,21 @@ internal class IssueFilterBar(
 
     private fun assigneeText(filter: AssigneeFilter): String =
         when (filter) {
-            AssigneeFilter.Unassigned -> IssueHubBundle["filter.assignee.unassigned"]
-            is AssigneeFilter.User ->
-                if (filter.login.equals(options.currentUser, ignoreCase = true)) IssueHubBundle["filter.assignee.me.short"] else filter.login
+            AssigneeFilter.Unassigned -> {
+                IssueHubBundle["filter.assignee.unassigned"]
+            }
+
+            is AssigneeFilter.User -> {
+                if (filter.login.equals(
+                        options.currentUser,
+                        ignoreCase = true,
+                    )
+                ) {
+                    IssueHubBundle["filter.assignee.me.short"]
+                } else {
+                    filter.login
+                }
+            }
         }
 
     private fun milestoneText(filter: MilestoneFilter): String =

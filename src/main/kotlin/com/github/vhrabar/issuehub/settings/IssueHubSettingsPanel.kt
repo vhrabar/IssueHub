@@ -50,7 +50,13 @@ internal class IssueHubSettingsPanel : JBPanel<IssueHubSettingsPanel>(BorderLayo
         ComboBox(IssueHubSettings.AUTO_REFRESH_CHOICES.toTypedArray()).apply {
             renderer =
                 SimpleListCellRenderer.create("") { minutes ->
-                    if (minutes == 0) IssueHubBundle["settings.autoRefresh.off"] else IssueHubBundle["settings.autoRefresh.minutes", minutes]
+                    if (minutes ==
+                        0
+                    ) {
+                        IssueHubBundle["settings.autoRefresh.off"]
+                    } else {
+                        IssueHubBundle["settings.autoRefresh.minutes", minutes]
+                    }
                 }
         }
 
